@@ -1,0 +1,3481 @@
+#+TITLE: Logika biznesowa
+
+#+PROPERTY: header-args:sql :engine postgresql
+#+PROPERTY: header-args:sql+ :dbhost host :dbuser postgres
+#+PROPERTY: header-args:sql+ :dbpassword password
+
+#+PROPERTY: header-args:python :session logika
+
+* inicjalizacja generatorów
+#+begin_src python :results none
+import psycopg2
+from faker import Faker
+
+fake = Faker()
+
+conn = psycopg2.connect("user=postgres host=192.210.175.26 password=#HenrykTelega2021")
+cur = conn.cursor()
+#+end_src
+* wyczyszczenie bazy
+#+begin_src sql
+DROP TABLE IF EXISTS
+  PlaneModels,
+  Carriers,
+  Planes,
+  Airports,
+  Docks,
+  Connections,
+  Flights,
+  Passengers,
+  Reservations,
+  Tickets,
+  LoyalityRanks,
+  Miles,
+  Lugagge,
+  Employees,
+  Vacations,
+  Trainings,
+  Employees_Trainings,
+  Shifts,
+  ShiftsHistory,
+  EMployees_Flights,
+  Shops,
+  Receipts,
+  Items,
+  Items_Receipts,
+  Suppliers,
+  Supplies
+CASCADE;
+#+end_src
+
+#+RESULTS:
+| DROP TABLE    |
+|---------------|
+| DROP FUNCTION |
+
+* tabelki [26/26]
+:PROPERTIES:
+:header-args:sql+: :tangle ./out/tables.sql
+:END:
+** DONE ~PlaneModels~
+Tabelka zawierająca dane o wszystkich dostępnych modelach samolotów.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE PlaneModels (
+  id VARCHAR(256) UNIQUE,
+  model VARCHAR(256),
+  capacity INT,
+  PRIMARY KEY (id)
+);
+#+end_src
+
+#+RESULTS:
+|---|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_plane_models(count=10):
+    models = []
+    for _ in range(count):
+        plane_id = fake.uuid4()
+        model = fake.license_plate()
+        capacity = fake.pyint(min_value=100, max_value=550)
+        models.append(
+            (
+                plane_id,
+                model,
+                capacity,
+            )
+        )
+    return models
+
+
+for model in generate_plane_models():
+    cur.execute("INSERT INTO PlaneModels VALUES (%s, %s, %s)", model)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM plane_models LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | model    | capacity |
+|--------------------------------------+----------+----------|
+| b2bf2307-da46-4192-9ad3-e1e6615d05b7 | 7-96824  |      162 |
+| 0a68f4f9-5e5f-4d4f-9d00-28ecb0e548c4 | GQW 250  |      283 |
+| 890d5730-3fb5-4a10-9d5c-e92d79e6f02c | NRW-8244 |      123 |
+| e126ec71-2daf-457d-bbc9-a05b4b64ba97 | 617NF    |      490 |
+| a2e7366a-6b14-4688-955e-484ed2ea8521 | PXR 844  |      543 |
+| 2d18fb54-16ce-4900-8bab-04ea65fa8854 | 61V L36  |      145 |
+| 0c9173fc-5a85-463e-8604-08033f291722 | 62AN460  |      276 |
+| f0a3c7e4-0fff-4a4c-b8ae-8fe5c6b3761e | EQA 778  |      343 |
+| 714efe88-bd8b-4359-a750-ae973beccffc | UQD-2558 |      528 |
+| aa8225e4-a0e4-4310-b64b-37c5f1709878 | 67MS673  |      343 |
+** DONE ~Carriers~
+Tabelka przechowująca dane o przewoźnikach.
+*** DONE utworzenie tabelki
+
+#+begin_src sql
+CREATE TABLE Carriers (
+  id VARCHAR(256) UNIQUE,
+  name VARCHAR(256),
+  PRIMARY KEY (id)
+);
+#+end_src
+
+#+RESULTS:
+|---|
+
+*** DONE generowanie danych
+
+#+begin_src python :results none
+def generate_carriers(count=10):
+    carriers = []
+    for _ in range(count):
+        carrier_id = fake.uuid4()
+        name = fake.company()
+        carriers.append(
+            (
+                carrier_id,
+                name,
+            )
+        )
+    return carriers
+
+
+for carrier in generate_carriers():
+    cur.execute("INSERT INTO Carriers VALUES (%s, %s)", carrier)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Carriers LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | name                      |
+|--------------------------------------+---------------------------|
+| aa2307b4-533f-479c-b987-2bcf2a2e5e14 | Hendricks-Kelly           |
+| 79a7147e-5f9a-4982-9030-e1e8d6cb4455 | Williams Ltd              |
+| 2cfcc0db-a61a-498c-b486-f95e293a1629 | Bradford-Torres           |
+| b509e6f4-4f54-4dcb-8483-626ef891b8aa | Reid, Doyle and Zamora    |
+| c7e18beb-211c-4d16-8f2d-8255316283b8 | Jones, Butler and Ayers   |
+| e27c9e18-e30d-462a-954e-1a05b730f02a | Alvarado-Armstrong        |
+| 29a8a49b-e583-40b5-a728-e0ac96d97bb9 | Cox, King and Massey      |
+| f086fe13-79ac-400d-9cd8-066ed7688592 | West, Wheeler and Kelley  |
+| 9088abfb-1068-4e0e-89e2-15c19aee3556 | Mills, Gibson and Stevens |
+| 1650d919-bc84-4255-b292-7281fabce80d | Wallace-Sweeney           |
+** DONE ~Planes~
+Tabelka przechowująca dane o pojedynczych samolotach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Planes (
+  serial VARCHAR(256),
+  model VARCHAR(256),
+  owner VARCHAR(256),
+  PRIMARY KEY (serial),
+  FOREIGN KEY (model) REFERENCES PlaneModels (id),
+  FOREIGN KEY (owner) REFERENCES Carriers (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_planes(count=10):
+    planes = []
+    for _ in range(count):
+        serial = fake.ssn()
+        cur.execute("SELECT id FROM PlaneModels ORDER BY RANDOM() LIMIT 1;")
+        model = cur.fetchone()[0]
+        cur.execute("SELECT id FROM Carriers ORDER BY RANDOM() LIMIT 1;")
+        owner = cur.fetchone()[0]
+        planes.append(
+            (
+                serial,
+                model,
+                owner,
+            )
+        )
+    return planes
+
+
+for plane in generate_planes():
+    cur.execute("INSERT INTO Planes VALUES (%s, %s, %s)", plane)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Planes LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| serial | model | owner |
+|--------+-------+-------|
+
+** DONE ~Airports~
+Tabelka przechowująca dane o lotniskach.
+*** DONE utworzenie tabelki
+
+#+begin_src sql
+CREATE TABLE Airports (
+  id VARCHAR(256),
+  name VARCHAR(256),
+  country VARCHAR(256),
+  city VARCHAR(256),
+  longitude FLOAT,
+  latitude FLOAT,
+  PRIMARY KEY (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_airports(count=10):
+    airports = []
+    for _ in range(count):
+        id = fake.uuid4()
+        name = fake.street_name()
+        country = fake.country()
+        city = fake.city()
+        longitude = fake.longitude()
+        latitude = fake.latitude()
+        airports.append((id, name, country, city, longitude, latitude))
+    return airports
+
+
+for airport in generate_airports():
+    cur.execute("INSERT INTO Airports VALUES (%s, %s, %s, %s, %s, %s)", airport)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Airports LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | name            | country                                             | city             |   longitude |    latitude |
+|--------------------------------------+-----------------+-----------------------------------------------------+------------------+-------------+-------------|
+| 0176643a-0c94-4412-a752-00e48133e5b6 | Yolanda Fords   | Maldives                                            | Browningbury     |  177.532177 |   68.281584 |
+| 5750272d-0e15-4aa3-b2f9-a15bcdcd6cf8 | Stacy Prairie   | British Indian Ocean Territory (Chagos Archipelago) | Lake Matthew     |  -75.787076 |    -4.02521 |
+| b97f51fe-dbf5-4ad3-8d9f-0e895aca71fb | Townsend Radial | Latvia                                              | Smithville       |   168.63818 |  43.2052485 |
+| b509e03c-3038-4fa8-9c45-10fa0a3f609f | Kane Cove       | Tunisia                                             | Wisemouth        |   77.667738 |  -30.640805 |
+| 8e3317c8-4ebd-41c9-aa88-ccb80927b853 | Crystal Rapids  | Tokelau                                             | Kelseyborough    |  101.835054 |  24.8714475 |
+| ad02feb0-732b-4d52-b8c3-737767de32e8 | Jeremiah Crest  | Cuba                                                | Christopherburgh |   82.013542 |  30.3543655 |
+| 6971e1ca-cf5a-464e-8159-6702a508793b | Williams Hollow | Denmark                                             | South Brian      |   44.753378 | -75.0297325 |
+| 1fdf053e-ebe4-4b32-b7ce-2d4021eec1a4 | Lowery Burgs    | Paraguay                                            | South Amberport  |    86.85526 |      2.0711 |
+| a850d9b1-7db2-4ee6-84d6-81f3b027f1a2 | Stout Ridges    | Tanzania                                            | Atkinsport       |   35.668398 |  -64.906449 |
+| 1480bb01-3e0e-4c99-9ec9-5836b9ed4e8f | Price Plains    | Lesotho                                             | New William      | -167.977713 |  59.0062055 |
+
+** DONE ~Docks~
+Tabelka przechowująca dane o bramkach (pojedyncze stanowisko z którego odlatuje / na które przylatuje samolot).
+*** DONE utworzenie tabelki
+
+#+begin_src sql
+CREATE TABLE Docks (
+  id VARCHAR(256) UNIQUE,
+  name VARCHAR(256),
+  airport VARCHAR(256),
+  PRIMARY KEY (id),
+  FOREIGN KEY (airport) REFERENCES airports (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_docks(count=None):
+    if count is None:
+        count = fake.pyint(min_value=1, max_value=20)
+    docks = []
+    for _ in range(count):
+        id = fake.uuid4()
+        name = fake.md5()[0:2]
+        docks.append((id, name))
+    return docks
+
+
+cur.execute("SELECT id FROM Airports ORDER BY RANDOM() LIMIT 10;")
+airports = map(lambda x: x[0], cur.fetchall())
+
+for airport in airports:
+    for dock in generate_docks():
+        cur.execute("INSERT INTO Docks VALUES (%s, %s, %s)", dock + (airport,))
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Docks LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | name | airport                              |
+|--------------------------------------+------+--------------------------------------|
+| bd33fc41-997b-4de5-8f90-4552169fcd00 |   3b | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| 4e4b639d-c5f9-41b9-b969-aae403a7f673 |   d0 | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| eaec62fc-981a-4c48-94a9-90fe88cbab23 |   b2 | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| 6a4385b1-af31-4be1-bd48-5c0b29d13fc9 |   20 | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| ba05e63c-eb24-4465-ab9e-28eb6d17a21e |   58 | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| 5016b1cb-64d7-4733-b56b-2efa4315d5bd |   91 | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| 66690c0c-315f-4a98-b46d-3adfc4eb0999 |   52 | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| bd2a267f-54a1-437f-a3dd-d050bd4804c8 |   56 | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| 6568a7de-c935-43e9-bc16-fffe1260a9e9 |   11 | eaedebe5-007a-400e-998a-5da937d4edb6 |
+| 8c21c3cb-183c-4547-8629-b12a0374192d |   2c | eaedebe5-007a-400e-998a-5da937d4edb6 |
+
+** DONE ~Connections~
+Tabelka przechowująca dane o połączeniach.
+*** DONE utworzenie tabelki
+
+#+begin_src sql
+CREATE TABLE Connections (
+  id VARCHAR(256),
+  departure_time TIME,
+  departure_day_of_week INT CHECK (departure_day_of_week BETWEEN 1 and 7),
+  departure_dock VARCHAR(256),
+  arrival_time TIME,
+  arrival_day_of_week INT CHECK (departure_day_of_week BETWEEN 1 and 7),
+  arrival_dock VARCHAR(256),
+  carrier VARCHAR(256),
+  loyality_miles INT DEFAULT 10, -- czemu 10? nikt nie wie
+  PRIMARY KEY (id),
+  FOREIGN KEY (departure_dock) REFERENCES docks (id),
+  FOREIGN KEY (arrival_dock) REFERENCES docks (id),
+  FOREIGN KEY (carrier) REFERENCES carriers (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+
+#+begin_src python :results none
+def generate_connections(count=20):
+    connections = []
+    for _ in range(count):
+        id = fake.uuid4()
+        departure_time = fake.time()
+        departure_day_of_week = fake.pyint(min_value=1, max_value=7)
+        cur.execute("SELECT id FROM Docks ORDER BY RANDOM() LIMIT 1;")
+        departure_dock = cur.fetchone()
+        arrival_time = fake.time()
+        arrival_day_of_week = (
+            departure_day_of_week + 1
+            if arrival_time < departure_time
+            else departure_day_of_week
+        ) % 7
+        cur.execute("SELECT id FROM Docks ORDER BY RANDOM() LIMIT 1;")
+        arrival_dock = cur.fetchone()
+        cur.execute("SELECT id FROM Carriers ORDER BY RANDOM() LIMIT 1;")
+        carrier = cur.fetchone()
+        connections.append(
+            (
+                id,
+                departure_time,
+                departure_day_of_week,
+                departure_dock,
+                arrival_time,
+                arrival_day_of_week,
+                arrival_dock,
+                carrier,
+            )
+        )
+    return connections
+
+
+for connection in generate_connections():
+    cur.execute(
+        "INSERT INTO Connections VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", connection
+    )
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Connections LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | departure_time | departure_day_of_week | departure_dock                       | arrival_time | arrival_day_of_week | arrival_dock                         | carrier                              | loyality_miles |
+|--------------------------------------+----------------+-----------------------+--------------------------------------+--------------+---------------------+--------------------------------------+--------------------------------------+----------------|
+| f3c32816-fa03-42a1-b73c-7b607d36ced4 |       12:37:07 |                     5 | cf54c80f-b1ad-4e96-a997-5447d4734f6b |     13:30:24 |                   5 | 1e518fa6-501c-4984-a620-7cfd53057d17 | 66072252-7fd1-4439-8eea-97f8d117bc41 |             10 |
+| f3069ca7-5119-4100-878a-79f966f68161 |       05:29:44 |                     1 | ffe61488-3c5c-43ca-ba85-7bdcc8354250 |     11:36:46 |                   1 | f7183f0c-0f1b-4394-9e96-d7ef99bd4af3 | 06487690-916d-4398-af2f-ded9692d9f55 |             10 |
+| 64e79100-8afe-4e2f-a6b2-2b7e551ae5a3 |       12:18:18 |                     2 | 680d310b-a4d4-4945-8600-424fd936632b |     00:15:34 |                   3 | dc0ffcb3-096f-4dcd-b92e-c7bab8b06652 | dfd03aaa-8222-4bcd-89b9-d53ed9208487 |             10 |
+| 4be96b8b-5cd1-4ec0-8d34-c3c95ebc44b0 |       10:46:11 |                     4 | 8bc6b0f1-a4ba-4fc1-97e0-84955cb4cfee |     01:29:38 |                   5 | be575264-7261-46f6-a473-08076697e4ea | e78091ce-bc87-4800-a24b-fae09874e409 |             10 |
+| 66dbabc8-b243-474e-842e-5e9c93eaee60 |       02:42:02 |                     3 | b1e13f0a-cf3f-4f3d-a354-4aa2df0b2ecd |     11:57:15 |                   3 | 7243c048-3d4d-4dbc-acad-e0ab8311243c | 06487690-916d-4398-af2f-ded9692d9f55 |             10 |
+| 96196cdb-ed58-4f22-986f-4a41d1e3212d |       01:37:32 |                     1 | 858c694b-4c36-4967-8e63-afa45ccd772e |     00:22:17 |                   2 | 8bda1ad1-8147-4436-842e-c2a33dc584ba | f1406ff9-9167-42fd-a6d9-ceb7cd90a0b3 |             10 |
+| ffdf920a-e2cf-4051-845c-987154579aba |       15:59:59 |                     3 | 1a87ccb3-f27f-4f80-828b-3d180fe1ed4e |     20:59:09 |                   3 | 250df81b-4907-4088-ba57-afab975b1524 | a1571b10-c858-4265-be46-5ee73676d16b |             10 |
+| bd3f48c4-e9da-4c2f-9d30-28b6f2947ee5 |       03:47:46 |                     1 | 36ee0461-444a-4c7b-94e2-b56bf2e4cfb8 |     18:37:24 |                   1 | 3fa6ada4-aa89-4e62-bfec-7a432c489ef1 | ff03bc6e-fbcf-4742-87cc-728fabfd1683 |             10 |
+| 8c0c7f32-53fd-4b12-a01a-7629edaca731 |       07:23:26 |                     1 | a943e27e-d5a6-4c1b-8e6d-d98b125fb8db |     09:26:27 |                   1 | f7183f0c-0f1b-4394-9e96-d7ef99bd4af3 | 7829190e-92ac-4198-a839-885cc3078c52 |             10 |
+| 91c3407e-5c28-4575-87ea-29ddbf0187b8 |       16:19:24 |                     7 | e36d3d7e-123d-4fed-b8c6-1eb054525474 |     16:10:11 |                   1 | 932c0ab8-f27f-41a2-a13d-a033e24fcb0e | e78091ce-bc87-4800-a24b-fae09874e409 |             10 |
+
+** DONE ~Flights~
+Tabelka przechowująca dane o pojedynczych lotach. Czas i daty są domyślnie spisywane z tabeli `Connections`, ale można je zmienić w przypadku np. upóźnienia samolotu.
+*** DONE utworzenie tabelki
+
+#+begin_src sql
+CREATE TABLE Flights (
+  id VARCHAR(256),
+  connection VARCHAR(256),
+  departure_time TIME,
+  arrival_time TIME,
+  departure_date DATE,
+  arrival_date DATE,
+  plane VARCHAR(256),
+  ticket_cost MONEY,
+  PRIMARY KEY (id),
+  FOREIGN KEY (plane) REFERENCES Planes (serial),
+  FOREIGN KEY (connection) REFERENCES Connections (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+
+#+begin_src python :results none
+from datetime import timedelta
+
+
+def generate_flights(count=1):
+    flights = []
+    for _ in range(count):
+        id = fake.uuid4()
+        cur.execute(
+            """
+        SELECT
+            id, departure_time, departure_day_of_week, arrival_time, arrival_day_of_week
+        FROM Connections
+        ORDER BY RANDOM() LIMIT 1
+        """
+        )
+        (
+            connection,
+            departure_time,
+            departure_day_of_week,
+            arrival_time,
+            arrival_day_of_week,
+        ) = cur.fetchone()
+        departure_date = fake.date_time()
+        departure_date = departure_date + timedelta(
+            days=departure_date.isoweekday() - departure_day_of_week
+        )
+        arrival_date = departure_date + timedelta(
+            days=arrival_day_of_week - departure_day_of_week
+        )
+        cur.execute("SELECT serial FROM planes ORDER BY RANDOM() LIMIT 1")
+        plane = cur.fetchone()
+        ticket_cost = fake.pyfloat(min_value=100, max_value=5000)
+        flights.append(
+            (
+                id,
+                connection,
+                departure_time,
+                arrival_time,
+                departure_date,
+                arrival_date,
+                plane,
+                ticket_cost,
+            )
+        )
+    return flights
+
+
+for flight in generate_flights():
+    cur.execute("INSERT INTO Flights VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", flight)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Flights LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | connection                           | departure_time | arrival_time | departure_date | arrival_date |       plane | ticket_cost |
+|--------------------------------------+--------------------------------------+----------------+--------------+----------------+--------------+-------------+-------------|
+| 9b861d70-5dc3-47df-961c-4d2e23b7edea | 2fa1fcde-44e7-4d17-b1b3-4b34f22df95f |       22:28:49 |     12:05:21 |     1992-11-05 |   1992-11-06 | 384-66-5904 | $3,816.83   |
+| 025e12e0-9cf5-494c-968a-74064886b61b | ffdf920a-e2cf-4051-845c-987154579aba |       15:59:59 |     20:59:09 |     1992-01-31 |   1992-01-31 | 384-66-5904 | $1,112.33   |
+| 9fc483dc-c2f2-4e94-accb-308862ccb7fa | 66dbabc8-b243-474e-842e-5e9c93eaee60 |       02:42:02 |     11:57:15 |     1998-10-20 |   1998-10-20 | 652-10-2052 | $613.80     |
+| 9f805d10-2a87-4776-9fbc-78faa551133f | 64e79100-8afe-4e2f-a6b2-2b7e551ae5a3 |       12:18:18 |     00:15:34 |     1995-11-30 |   1995-12-01 | 549-89-9963 | $623.98     |
+| 4dea33a6-6e62-4f20-b711-c047dd336098 | f1cf9821-19ff-4151-bee7-1e52ee7d19d3 |       10:02:23 |     12:10:37 |     1995-03-07 |   1995-03-07 | 649-32-4525 | $1,980.61   |
+| 6c05e4b8-ad23-4acf-832d-2e3f66d4e86f | 2de62750-053f-4829-997f-50d75ec67c1b |       13:22:58 |     02:10:09 |     1975-10-15 |   1975-10-16 | 652-10-2052 | $4,850.68   |
+| f9146b09-d526-440f-a17a-b145adeaaae4 | 64e79100-8afe-4e2f-a6b2-2b7e551ae5a3 |       12:18:18 |     00:15:34 |     1995-01-14 |   1995-01-15 | 297-08-5928 | $4,982.00   |
+| f1113cb3-4c25-4f0d-92e9-03ca990b2c19 | 8c0c7f32-53fd-4b12-a01a-7629edaca731 |       07:23:26 |     09:26:27 |     1973-06-07 |   1973-06-07 | 606-96-4715 | $2,921.90   |
+| ad173691-76eb-4aee-89e9-16ea544ed2f9 | 2fa1fcde-44e7-4d17-b1b3-4b34f22df95f |       22:28:49 |     12:05:21 |     1984-11-06 |   1984-11-07 | 783-68-3658 | $1,118.89   |
+| 12566c78-2896-4759-90d4-66cfb0127fe4 | ca9732ef-90a3-46e5-aab9-5c692fe9daef |       19:48:01 |     23:11:43 |     1975-10-19 |   1975-10-12 | 725-86-0256 | $3,656.26   |
+
+** DONE ~Passengers~
+Tabelka przechowująca dane o pasażerach.
+*** DONE utworzenie tabelki
+
+#+begin_src sql
+CREATE TABLE Passengers (
+  id VARCHAR(256) UNIQUE,
+  id_type VARCHAR(256),
+  name VARCHAR(256),
+  surname VARCHAR(256),
+  birth_date DATE,
+  PRIMARY KEY (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+
+#+begin_src python :results none
+def generate_passengers(count=100):
+    passengers = []
+    for _ in range(count):
+        person = fake.profile()
+        id = fake.uuid4()
+        id_type = fake.md5()[0:4]
+        (name, surname) = tuple(person["name"].split(" ")[0:2])
+        birth_date = person["birthdate"]
+        passengers.append((id, id_type, name, surname, birth_date))
+    return passengers
+
+
+for passenger in generate_passengers():
+    cur.execute("INSERT INTO Passengers VALUES (%s, %s, %s, %s, %s)", passenger)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Passengers LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | id_type | name     | surname  | birth_date |
+|--------------------------------------+---------+----------+----------+------------|
+| f719bbdf-f120-4c30-9e77-d69b80a4b6dd | 7190    | Eric     | Green    | 1912-11-27 |
+| 9695c455-ce14-4e15-a850-b2039a2bf4a4 | 721b    | Emily    | Schultz  | 1950-11-17 |
+| 67c4c4ba-7a4c-467a-9e13-044d646b1ab1 | 7e0c    | Dr.      | Kimberly | 1991-06-18 |
+| 7de29481-72bb-4994-80aa-40d23c582d50 | c142    | Sara     | Johnson  | 1934-12-03 |
+| ee31d682-d981-4256-bd00-739c254659e6 | 3ff0    | Sean     | Smith    | 1910-03-30 |
+| 49a4c370-58d1-4ec0-8322-393989b135b3 | 3ea9    | Brittany | Rivera   | 1991-07-21 |
+| 0d662297-0394-431b-8385-6a092e2536b5 | 0868    | Amber    | Taylor   | 2002-11-20 |
+| 2bb46a66-4798-4822-b203-4479bcb86b62 | baaf    | William  | Martin   | 2003-02-19 |
+| 243210e8-80ba-4c25-bcef-50a738b540c0 | 2514    | Robert   | Wallace  | 1959-12-08 |
+| f6fbe781-9a01-46e9-ac7d-376124b5f6f2 | 5c8b    | Mark     | Figueroa | 1952-04-20 |
+
+** DONE ~Reservations~
+Tabelka przechwoująca dane o rezerwacjach biletów.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Reservations (
+  id VARCHAR(256),
+  flight VARCHAR(256),
+  passenger VARCHAR(256),
+  expire_date DATE,
+  expire_time TIME,
+  PRIMARY KEY (flight, passenger),
+  FOREIGN KEY (flight) REFERENCES Flights (id),
+  FOREIGN KEY (passenger) REFERENCES Passengers (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+from datetime import timedelta
+
+def generate_reservations(count=10):
+    reservations = []
+    for _ in range(count):
+        id = fake.uuid4()
+        cur.execute(
+            """
+        SELECT
+            id
+        FROM Flights
+        ORDER BY RANDOM() LIMIT 1
+        """
+        )
+        (
+           flight
+        ) = cur.fetchone()
+        cur.execute(
+            """
+        SELECT
+            id
+        FROM Passengers
+        ORDER BY RANDOM() LIMIT 1
+        """
+        )
+        (
+           passenger
+        ) = cur.fetchone()
+
+        expire_time = fake.time()
+        expire_date = fake.date_time()
+
+        reservations.append(
+            (
+                id,
+                flight,
+                passenger,
+                expire_date,
+                expire_time,
+            )
+        )
+    return reservations
+
+
+for reservation in generate_reservations():
+    print(reservation)
+    cur.execute("INSERT INTO Reservations VALUES (%s, %s, %s, %s, %s)", reservation)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Reservations LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | flight                               | passenger                            | expire_date | expire_time |
+|--------------------------------------+--------------------------------------+--------------------------------------+-------------+-------------|
+| 15057301-858a-421d-9d51-cd7b6c12baa9 | a12a3301-6753-4421-94c3-50828590c73e | 7fe852f3-d364-439e-9771-8a34dd8bbf2c |  2002-06-06 |    23:18:15 |
+| 246e3e63-3e09-44c2-9a92-f95f241e7f90 | e54ef60a-dd77-41be-9f24-ce5d3144ddbe | 3ecba130-8829-4e6c-beb1-e898849b9ecf |  2006-11-04 |    20:14:10 |
+| 58201777-dd0d-43ad-94a3-3365016c7921 | 9b861d70-5dc3-47df-961c-4d2e23b7edea | a6b5593f-f549-485b-af52-45764d094de0 |  2014-03-27 |    21:48:23 |
+| 856644b3-43dc-434a-9a45-4d6bdb6fadbd | 39de5c68-13dd-4c6a-8690-c9af5d6fcdbb | 205ba34b-bfa8-44dc-906b-12ba070084e4 |  2002-10-16 |    23:51:32 |
+| b14d858f-e75d-4a95-a643-d9e2fb5c9858 | 6c05e4b8-ad23-4acf-832d-2e3f66d4e86f | 15c15ee3-d536-42ac-9083-196279d5e8c7 |  1997-12-08 |    21:50:23 |
+| a5793ea3-e367-4b48-8da7-793ae58e1757 | 5f3ee840-6df7-4a4a-bc5c-60599d63e255 | 1fb27c60-5dd2-495d-82ca-0972d48c447c |  1988-03-12 |    12:14:52 |
+| 240bed35-70ec-4e4b-bcff-4ab7fcf50a1c | 9a5b8ed6-ef0c-46d0-9572-73ff98c280c5 | 99f6415c-935b-417e-a1ab-4a80edb2c770 |  2014-01-17 |    11:21:32 |
+| d21fbf74-7b24-4c7d-ada5-05842db2d15f | 05dd29ea-8177-47fc-8f22-0c463abfc82b | 89453dbf-de7a-4483-ad2c-14788abc7040 |  1970-07-05 |    09:44:06 |
+| bc97c275-3684-4da6-b230-2d1a618245f9 | 06fd93f4-e67d-450a-b577-f90aa3088b10 | c800f661-48a9-4f2a-8062-24e57627238a |  1996-05-03 |    08:26:49 |
+| 03a36e92-3ce3-4e0b-a1cb-4dd236db3a97 | 4219a238-01c7-4441-8553-0ef67762af86 | 388c9f3a-4163-4361-9978-14f0d0f5461b |  2009-01-24 |    13:21:21 |
+
+** DONE ~Tickets~
+Tabelka przechowująca dane o biletach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Tickets (
+  ref VARCHAR(256),
+  passenger VARCHAR(256),
+  flight VARCHAR(256),
+  cost MONEY,
+  PRIMARY KEY (ref),
+  FOREIGN KEY (passenger) REFERENCES Passengers (id),
+  FOREIGN KEY (flight) REFERENCES Flights (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+
+#+begin_src python :results none
+def generate_tickets(count=100):
+    tickets = []
+    for _ in range(count):
+        ref = fake.md5()[0:10]
+        cur.execute("SELECT id FROM Passengers ORDER BY RANDOM() LIMIT 1;")
+        passenger = cur.fetchone()[0]
+        cur.execute("SELECT id, ticket_cost FROM Flights ORDER BY RANDOM() LIMIT 1;")
+        (
+            flight,
+            price,
+        ) = cur.fetchone()
+        tickets.append((ref, passenger, flight, price))
+    return tickets
+
+
+for ticket in generate_tickets():
+    cur.execute("INSERT INTO Tickets VALUES (%s, %s, %s, %s)", ticket)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Tickets LIMIT 10;
+#+end_src
+
+#+RESULTS:
+|---|
+
+** DONE ~LoyalityRanks~
+Tabelka przecowująca informację o minimalnych progach punktowych (milach) na zniżki u przewoźnika.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE LoyalityRanks (
+  minimum_miles INT,
+  rank_name VARCHAR(256),
+  discount FLOAT,
+  carrier VARCHAR(256),
+  PRIMARY KEY (carrier, minimum_miles),
+  FOREIGN KEY (carrier) REFERENCES Carriers (id)
+);
+#+end_src
+
+#+RESULTS:
+|---|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_ranks(count=100):
+    ranks = []
+    for _ in range(count):
+        minimum_miles = fake.pyint(min_value=1000, max_value=50000)
+        rank_name = fake.color_name()
+        cur.execute("SELECT id FROM Carriers ORDER BY RANDOM() LIMIT 1;")
+        carrier = cur.fetchone()[0]
+        discount = fake.pyint(min_value=0, max_value=50)
+        ranks.append(
+            (
+                minimum_miles,
+                rank_name,
+                discount,
+                carrier
+            )
+        )
+    return ranks
+
+
+for rank in generate_ranks():
+    cur.execute("INSERT INTO LoyalityRanks VALUES (%s, %s, %s, %s)", rank)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM LoyalityRanks ORDER BY minimum_miles ASC LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| minimum_miles | rank_name     | discount | carrier                              |
+|---------------+---------------+----------+--------------------------------------|
+|          1855 | Ivory         |       27 | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b |
+|          2971 | DarkGoldenRod |       36 | 04d96505-69a4-4d21-980f-6a92993d0319 |
+|          3936 | Peru          |       50 | 92bcc3ab-bfac-4324-b0c1-325485a19477 |
+|          4029 | DarkGreen     |       47 | 91624880-4425-411f-a06a-a2f673bafe24 |
+|          4300 | Gold          |       48 | 039dacc1-ac56-465b-960c-6197fd178860 |
+|          4415 | Bisque        |        7 | 91624880-4425-411f-a06a-a2f673bafe24 |
+|          4636 | Snow          |       12 | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b |
+|          5251 | LightCoral    |       31 | 255cb193-58d7-4185-9657-e91fda8110f5 |
+|          5479 | Pink          |       34 | 445e3a88-7811-4432-b6fd-7975f8be2834 |
+|          6054 | IndianRed     |       16 | 91624880-4425-411f-a06a-a2f673bafe24 |
+
+** DONE ~Miles~
+Tabelka przechwoująca dane o punktach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Miles (
+  id VARCHAR(256),
+  carrier VARCHAR(256),
+  passenger VARCHAR(256),
+  miles INT,
+  description VARCHAR(256),
+  PRIMARY KEY (id),
+  FOREIGN KEY (carrier) REFERENCES Carriers (id),
+  FOREIGN KEY (passenger) REFERENCES Passengers (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_miles(count=100):
+    entries = []
+    for _ in range(count):
+        id = fake.uuid4()
+        cur.execute("SELECT id FROM Passengers ORDER BY RANDOM() LIMIT 1;")
+        passenger = cur.fetchone()[0]
+        cur.execute("SELECT id FROM Carriers ORDER BY RANDOM() LIMIT 1;")
+        carrier = cur.fetchone()[0]
+        miles = fake.pyint(min_value=100, max_value=5000)
+        description = fake.sentence(nb_words=10)
+        entries.append((id, carrier, passenger, miles, description))
+    return entries
+
+
+for mile in generate_miles():
+    cur.execute("INSERT INTO Miles VALUES (%s, %s, %s, %s, %s)", mile)
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Miles LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | carrier                              | passenger                            | miles | description                                                                                    |
+|--------------------------------------+--------------------------------------+--------------------------------------+-------+------------------------------------------------------------------------------------------------|
+| 7959dbce-afe8-44f5-aee9-89afdf5618ea | 2b9b2103-729c-4c2d-807e-7e1e425bbe1e | 01bfa570-5084-45e3-ba7e-e8c34ccc348b |  1963 | History machine whole forget you gun poor.                                                     |
+| 7829ae51-9046-437c-9932-2af138cf4776 | a4cd7a3f-196c-4086-8b92-54bb688278fb | 32335d68-58cd-458a-bb6a-30e3445512b5 |  1335 | Than or sign modern pay pick many entire.                                                      |
+| dfcee6d4-9537-4c50-86c2-0aa46cbf595d | 9e256939-f2be-4945-a76d-c8b5da0cbda8 | ee2627f8-0196-4111-a643-394703dbb3d6 |  4040 | Produce who far behind term see quite answer present live may.                                 |
+| 032a0139-e7e0-41d6-8d68-33339ef14d76 | a4cd7a3f-196c-4086-8b92-54bb688278fb | 48a349fc-a279-4fc9-9620-0fe0c39a3c2b |  3704 | Sound foreign skill ago people but direction age.                                              |
+| e1c7ae90-cce8-4cea-a880-99eb111b4147 | f9150ef3-e474-47c7-828d-172631ceed8d | cb9974df-e9a6-4628-869f-4dbf6c5cd2f4 |  2740 | Over strategy value professor war treatment type left back song site.                          |
+| e54abd88-7d0a-4432-a301-9082e22ea609 | 9e256939-f2be-4945-a76d-c8b5da0cbda8 | 615df0a5-f203-4e55-980e-5e774525a68c |  2033 | Resource pressure commercial like save involve will forget bad network benefit.                |
+| 365c19fa-f346-4c10-bfd1-b44a3dbc6023 | f9150ef3-e474-47c7-828d-172631ceed8d | 02a7489d-5017-422c-b2b5-2551fdf8ec6b |  3721 | Project age everybody visit staff market case everything especially cause conference identify. |
+| b4396db9-4c2b-4a01-841a-17a92de3ac33 | 9e256939-f2be-4945-a76d-c8b5da0cbda8 | 91403ed2-74ad-4e30-8ef7-93a7f4004d67 |  2399 | Official scientist field establish movement wish speech man security.                          |
+| 664441a6-4e73-4846-bf5d-327f212e642b | 39356e5a-aea7-4878-9e2f-e88759e0bc48 | a7ed81fc-5458-4704-856c-676c75e82525 |  3757 | Offer whether wonder doctor certainly leader kind expect take full.                            |
+| 8804e5f0-39d5-46c8-8dd3-45721255dbe0 | f9150ef3-e474-47c7-828d-172631ceed8d | d2798dee-3c50-429b-a331-ac8c0b08685e |  3023 | Science should take while personal raise maintain affect fast born.                            |
+
+** DONE ~Luggage~
+Tabelka przechowująca dane o bagażach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Luggage (
+  id VARCHAR(256),
+  height INT, -- największy wymiar w centymetrach
+  width INT, -- średni wymiar w centymetrach
+  depth INT, -- najmniejszy wymiar w centymetrach
+  ticket VARCHAR(256),
+  PRIMARY KEY (id),
+  FOREIGN KEY (ticket) REFERENCES Tickets (ref)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_luggage(count=10):
+    luggage = []
+    for _ in range(count):
+        id = fake.uuid4()
+        cur.execute("SELECT ref FROM Tickets ORDER BY RANDOM() LIMIT 1;")
+        height = fake.pyint(min_value=1, max_value=30) * 10
+        width = fake.pyint(min_value=1, max_value=height / 10) * 10
+        depth = fake.pyint(min_value=1, max_value=width / 10) * 10
+        ticket = cur.fetchone()[0]
+        luggage.append((id, height, width, depth, ticket))
+    return luggage
+
+
+for luggage in generate_luggage():
+    cur.execute("INSERT INTO Luggage VALUES (%s, %s, %s, %s, %s)", luggage)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Luggage LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | width | height | depth | passenger_id | flight_id |
+|--------------------------------------+-------+--------+-------+--------------+-----------|
+| 59655307-3c04-4420-b96d-d487b1492ef1 |   100 |     10 |    10 | 17193ac15e   |           |
+| 447b44b3-f7cd-4511-a362-4d839e7299a1 |    10 |     10 |    10 | d80452344e   |           |
+| 51aeef12-0780-435e-8a68-a235f1a3b28b |    30 |     20 |    20 | 17193ac15e   |           |
+| 3584df85-c157-43d7-9f0c-0861ebbc8687 |    30 |     20 |    10 | 34ba2767fd   |           |
+| 34d031ed-04f9-453c-bc7a-5ff2b8b260d3 |    20 |     20 |    10 | 34ba2767fd   |           |
+| e0fe2dd0-5c78-44f1-bafb-d9e52dd25864 |    80 |     10 |    10 | 2a81eee898   |           |
+| d96f3843-12c3-4256-a53c-598926cf5217 |    60 |     60 |    10 | aac08006cf   |           |
+| 63bf5c97-8670-4163-af51-457964292131 |    10 |     10 |    10 | 243499ece2   |           |
+| 736f3422-1f96-42f3-9b00-188f36b2e0db |   100 |     50 |    10 | 243499ece2   |           |
+| 822e293d-9479-4e7e-8480-f020e17b6e20 |   100 |     40 |    20 | 48029b0157   |           |
+
+** DONE ~Employees~
+Tabelka przechwoująca dane o pracownikach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Employees (
+  id VARCHAR(256),
+  name VARCHAR(256),
+  surname VARCHAR(256),
+  birth_date DATE,
+  job_title VARCHAR(256),
+  principal VARCHAR(256),
+  PRIMARY KEY (id),
+  FOREIGN KEY (principal) REFERENCES Employees (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_employees(count=10):
+    employees = []
+    for _ in range(count):
+        person = fake.profile()
+        id = fake.uuid4()
+        (name, surname) = tuple(person["name"].split(" ")[0:2])
+        birth_date = person["birthdate"]
+        job_title = person["job"]
+        cur.execute("SELECT id FROM Employees ORDER BY RANDOM() LIMIT 1;")
+        employees.append((id, name, surname, birth_date, job_title))
+    return employees
+
+
+for employee in generate_employees():
+    cur.execute("INSERT INTO Employees VALUES (%s, %s, %s, %s, %s, NULL)", employee)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Employees LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | name      | surname   | birth_date | job_title                    | principal |
+|--------------------------------------+-----------+-----------+------------+------------------------------+-----------|
+| 4ffd1e5a-9ef1-435c-88a4-856e2fa58d7d | Lisa      | Fisher    | 1972-11-23 | Manufacturing engineer       |           |
+| 581f28da-c19a-44df-999a-f11e0de3594e | Christina | Zavala    | 1911-05-18 | Water engineer               |           |
+| e97b861d-a3a9-45eb-a377-dbb321bf2ae7 | Gina      | Rodriguez | 1957-03-16 | IT sales professional        |           |
+| 8a5f9744-b7e3-4af1-81a3-f2e51a7bc03a | Gregory   | Rodriguez | 1998-03-30 | Hotel manager                |           |
+| bcb0f144-f25f-412a-a69a-3345da695966 | Ashley    | Warren    | 1920-04-02 | Financial adviser            |           |
+| 0937abc6-157e-4801-8d18-1c2494a69152 | Denise    | Nielsen   | 1982-10-12 | Clinical cytogeneticist      |           |
+| 66088faf-f31b-4304-95cb-98e30bf15c39 | David     | Booth     | 1942-08-16 | Clinical biochemist          |           |
+| 57c7ba1e-ee0a-4a8e-803f-aa889c34d6db | Jennifer  | Torres    | 2000-01-24 | Media planner                |           |
+| 227cbe88-c272-4c3b-a9f3-5e2b3a7ddb11 | Karen     | Rodriguez | 1940-03-29 | Community development worker |           |
+| 86872457-b439-4f23-8930-d039136aa10e | Kathleen  | Harris    | 1969-05-15 | Teacher, early years/pre     |           |
+
+** DONE ~Vacations~
+Tabelka przechowująca dane o urlopach pracowników.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Vacations (
+  employee VARCHAR(256),
+  start_date DATE,
+  end_date DATE,
+  PRIMARY KEY (employee, start_date),
+  FOREIGN KEY (employee) REFERENCES employees (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_vacations(count=100):
+    vacations = []
+    for _ in range(count):
+        start_date = fake.date_time()
+        end_date = fake.date_time()
+        if start_date > end_date:
+            (start_date, end_date) = (end_date, start_date)
+        cur.execute("SELECT id FROM Employees ORDER BY RANDOM() LIMIT 1;")
+        employee = cur.fetchone()[0]
+        vacations.append((employee, start_date, end_date))
+    return vacations
+
+
+for vacations in generate_vacations():
+    cur.execute("INSERT INTO Vacations VALUES (%s, %s, %s)", vacations)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Vacations LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| employee                             | start_date |   end_date |
+|--------------------------------------+------------+------------|
+| 52288553-d39e-4027-9051-b5375d7724c5 | 1982-07-05 | 1994-12-03 |
+| 2a4d7289-067c-4221-9031-317e006dd5d3 | 1981-04-21 | 2003-09-24 |
+| 0b58c993-15f5-49cc-a4ff-8b638cb08a56 | 2010-08-06 | 2014-01-27 |
+| bcb0f144-f25f-412a-a69a-3345da695966 | 1972-06-23 | 1996-08-12 |
+| 6623ea29-11b5-44f4-bec5-fc09c887db27 | 1975-09-22 | 2018-12-22 |
+| b1e2715e-50a4-4f49-a475-591d69be8ad6 | 1997-11-28 | 2003-06-18 |
+| c9c84a1a-2631-42af-ba4c-22600b77e775 | 2009-01-08 | 2017-08-11 |
+| 57c7ba1e-ee0a-4a8e-803f-aa889c34d6db | 1990-01-13 | 2005-04-25 |
+| c5986ef6-d42a-433a-bf4a-1f1f21fcdf7f | 2003-05-16 | 2013-02-22 |
+| a7358431-de5b-47d2-b0fc-459a9bf6b833 | 1979-12-07 | 2002-04-10 |
+
+** DONE ~Trainings~
+Tabeka przechowująca dane o szkoleniach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Trainings (
+  id VARCHAR(256),
+  topic VARCHAR(256),
+  date DATE,
+  PRIMARY KEY (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_trainings(count=10):
+    trainings = []
+    for _ in range(count):
+        id = fake.uuid4()
+        topic = fake.sentence(nb_words=7)
+        date = fake.date_time()
+        trainings.append(
+            (
+                id,
+                topic,
+                date,
+            )
+        )
+    return trainings
+
+
+for training in generate_trainings():
+    cur.execute("INSERT INTO Trainings VALUES (%s, %s, %s)", training)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Trainings LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | topic                                                              |       date |
+|--------------------------------------+--------------------------------------------------------------------+------------|
+| 3905576a-1d71-459f-b969-94c4b6c3d597 | Must form kitchen also action ability face treat wrong.            | 1984-02-02 |
+| 4704abc1-7f59-49f8-b63d-12aa3f29d79b | International cup institution rise husband.                        | 2009-11-18 |
+| 07c38cc6-3562-4bf5-bedb-1d4acc048029 | Full beat grow add win each drop effect.                           | 1987-02-20 |
+| 20207734-dd15-47ae-9d48-ec8ffef475c9 | Attack probably forget specific assume break.                      | 1974-12-22 |
+| 39a36793-83c4-49c5-bc70-c7091ed6a660 | Quite heart discover man lay west during.                          | 2016-07-24 |
+| 735175e2-6f99-44a6-ad66-938b085b9021 | Night quickly baby management case including.                      | 2013-05-19 |
+| 58352a7f-8eeb-49e5-861a-3b26b1cdabb9 | Boy believe while direction far morning indeed leg country.        | 1990-09-30 |
+| 400b212a-7c5a-4c48-bba3-f7772d10bf24 | Inside have material total eye here government usually during.     | 2010-01-19 |
+| fb4b0325-1d47-4d68-8ee7-889238a5b661 | Into thing stop know eat newspaper.                                | 1989-07-30 |
+| dcc01f9f-cd79-465e-923e-44e054708a24 | Statement fight factor resource lot building public southern trip. | 2016-07-30 |
+
+** DONE ~Employees_Trainings~
+Tabelka przechowująca dane o szkoleniach odbytych przez pracowników. 
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Employees_Trainings (
+  employee VARCHAR(256),
+  training VARCHAR(256),
+  FOREIGN KEY (employee) REFERENCES Employees (id),
+  FOREIGN KEY (training) REFERENCES Trainings (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_entries(count=100):
+    entries = []
+    for _ in range(count):
+        cur.execute("SELECT id FROM Employees ORDER BY RANDOM() LIMIT 1;")
+        employee = cur.fetchone()[0]
+        cur.execute("SELECT id FROM Trainings ORDER BY RANDOM() LIMIT 1;")
+        training = cur.fetchone()[0]
+        entries.append((employee, training))
+    return entries
+
+
+for entry in generate_entries():
+    cur.execute("INSERT INTO Employees_Trainings VALUES (%s, %s)", entry)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Employees_Trainings LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| employee                             | training                             |
+|--------------------------------------+--------------------------------------|
+| 227cbe88-c272-4c3b-a9f3-5e2b3a7ddb11 | 735175e2-6f99-44a6-ad66-938b085b9021 |
+| 61d4d082-32c7-41c8-b272-2652e5f4ac1a | 58352a7f-8eeb-49e5-861a-3b26b1cdabb9 |
+| e8d68fab-7395-4357-a4f7-e79908aa977b | 3905576a-1d71-459f-b969-94c4b6c3d597 |
+| 1b9c6de6-5130-470b-83dc-7f5e99345149 | 39a36793-83c4-49c5-bc70-c7091ed6a660 |
+| 52288553-d39e-4027-9051-b5375d7724c5 | 07c38cc6-3562-4bf5-bedb-1d4acc048029 |
+| 52288553-d39e-4027-9051-b5375d7724c5 | fb4b0325-1d47-4d68-8ee7-889238a5b661 |
+| 84a5eb4e-5f5e-435a-a2c4-c9b58b10a5bd | 3905576a-1d71-459f-b969-94c4b6c3d597 |
+| 989227c1-e291-4e6b-8755-2cfef0c8f742 | fb4b0325-1d47-4d68-8ee7-889238a5b661 |
+| af30e925-a171-4f51-8c33-303bfb07769b | fb4b0325-1d47-4d68-8ee7-889238a5b661 |
+| eb8fbf02-c882-4bfe-a1a0-75472ff757a4 | 20207734-dd15-47ae-9d48-ec8ffef475c9 |
+
+** DONE ~Shifts~
+Tabelka przechowująca dane o aktualnych godzinach pracy pracowników. (Zakładamy że start_time < end_time - zmiana zaczyna się i kończy w ciągu jednego dnia.)
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Shifts (
+  employee VARCHAR(256),
+  start_time TIME,
+  end_time TIME,
+  FOREIGN KEY (employee) REFERENCES Employees (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_shifts(count=100):
+    shifts = []
+    cur.execute("SELECT id FROM Employees ORDER BY RANDOM() LIMIT 100;")
+    employees = map(lambda x: x[0], cur.fetchall())
+    for employee in employees:
+        start_time = fake.time()
+        end_time = fake.time()
+        if start_time > end_time:
+            (start_time, end_time) = (end_time, start_time)
+        shifts.append((employee, start_time, end_time))
+    return shifts
+
+
+for shift in generate_shifts():
+    cur.execute("INSERT INTO Shifts VALUES (%s, %s, %s)", shift)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Shifts LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| employee                             | start_time | end_time |
+|--------------------------------------+------------+----------|
+| f52cecc8-ac21-4f88-8d4b-3444dcf92276 |   00:24:27 | 19:54:45 |
+| cb5643cc-d4a7-4f38-b72c-127236ac003d |   07:10:15 | 17:40:18 |
+| 5363897c-f339-48ab-91e4-9ebaa6a06119 |   16:00:52 | 16:16:27 |
+| b7eb1df5-f929-4d07-961e-65edc5e82fc0 |   08:14:16 | 08:45:42 |
+| 8e46361e-fa4a-43cc-802a-66443ffdb4d0 |   12:18:58 | 16:34:39 |
+| eafebd47-5c3c-4722-892f-b1d107549cd6 |   13:24:03 | 14:13:48 |
+| bf1ea276-a61f-4c53-aba3-5c0b0c185999 |   17:55:55 | 18:29:34 |
+| c5986ef6-d42a-433a-bf4a-1f1f21fcdf7f |   09:53:46 | 17:08:40 |
+| 7c587f98-c710-4712-9d1e-99811b719c91 |   07:58:38 | 18:17:41 |
+| 39edaa93-2116-4436-a663-e4ec5a3a1c53 |   09:52:44 | 15:17:36 |
+
+** DONE ~ShiftsHistory~
+Tabelka przechwoująca dane o nieaktualnych już zmianach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE ShiftsHistory (
+  employee VARCHAR(256),
+  start_date DATE,
+  end_date DATE,
+  start_time TIME,
+  end_time TIME,
+  FOREIGN KEY (employee) REFERENCES Employees (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+from datetime import timedelta
+def generate_shifts_history(count=100):
+    entries = []
+    cur.execute("SELECT employee, start_time, end_time FROM Shifts ORDER BY RANDOM() LIMIT 100;")
+    shifts = cur.fetchall()
+    for shift in shifts:
+        (employee, start_time, end_time) = shift
+        start_date = fake.date_time()
+        change_date = fake.date_time()
+        old_start_time = fake.time()
+        old_end_time = fake.time()
+        if (old_start_time < old_end_time):
+            (old_start_time, old_end_time) = (old_end_time, old_start_time)
+        if (start_date < change_date):
+            (start_date, change_date) = (change_date, start_date)
+        entries.append((employee, start_date, change_date, old_start_time, old_end_time))
+        entries.append((employee, change_date+timedelta(days=1), None, start_time, end_time))
+    return entries
+
+
+for entry in generate_shifts_history():
+    cur.execute("INSERT INTO ShiftsHistory VALUES (%s, %s, %s, %s, %s)", entry)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM ShiftsHistory LIMIT 10;
+#+end_src
+
+** DONE ~Employees_Flights~
+Tabelka przechowująca dane o lotach pracowników (stewardessy/piloci).
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Employees_Flights (
+  employee VARCHAR(256),
+  flight VARCHAR(256),
+  FOREIGN KEY (employee) REFERENCES Employees (id),
+  FOREIGN KEY (flight) REFERENCES Flights (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_employees_flights(count=100):
+    entries = []
+    for _ in range(count):
+        cur.execute("SELECT id FROM Employees ORDER BY RANDOM() LIMIT 1;")
+        employee = cur.fetchone()[0]
+        cur.execute("SELECT id FROM FLights ORDER BY RANDOM() LIMIT 1;")
+        flight = cur.fetchone()[0]
+        entries.append((employee, flight))
+    return entries
+
+
+for entry in generate_employees_flights():
+    cur.execute("INSERT INTO Employees_Flights VALUES (%s, %s)", entry)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Employees_Flights LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| employee                             | flight                               |
+|--------------------------------------+--------------------------------------|
+| 1b50c7aa-6887-4de4-af4a-66477c81e54a | 1a8f6cc9-0d9c-433d-a2f2-589db4218814 |
+| df86183f-632a-4a2e-bd54-9a286513abae | 87d6681f-5195-45d0-b00a-0c8ab1dc6cc2 |
+| 09083607-2bb4-42bf-8326-b846faf90400 | 1b94eaa5-96e5-4d4d-8af9-09f568c79726 |
+| 989227c1-e291-4e6b-8755-2cfef0c8f742 | 09ee23f2-e357-4d4f-ad49-3f278f7f21e7 |
+| 716ed2de-0163-40aa-a428-d2945783c2f1 | 9c17f1bf-f181-4d13-a812-53d67a44b657 |
+| 419eec46-ec6c-450d-904f-359b95c19d59 | e407f8d4-44c2-4c15-9061-469302311669 |
+| 3a22920b-6b48-4194-ba13-d5dac016e0fa | 32288a06-ab3c-4ee5-b348-754da463b991 |
+| b017863f-c969-4c15-8743-be6c42e53e4f | 17f66762-e490-46b4-a3ea-06ec7f861267 |
+| 0b58c993-15f5-49cc-a4ff-8b638cb08a56 | a21c62f6-22c5-47bb-9778-cf82d81f9058 |
+| 0b6f3685-4937-48f9-84bf-a3d1ce150dd1 | e6c760c2-1829-40a4-98d7-20b1fff425d1 |
+
+** DONE ~Shops~
+Tabelka przechowująca dane o sklepach znajdujących się na naszym lotnisku.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Shops (
+  id VARCHAR(256),
+  name VARCHAR(256),
+  location INT,
+  PRIMARY KEY (id)
+);
+#+end_src
+
+#+RESULTS:
+|---|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_shops(count=10):
+    shops = []
+    for _ in range(count):
+        id = fake.uuid4()
+        name = fake.sentence(nb_words=2)
+        location = fake.pyint(min_value=1, max_value=200)
+        shops.append(
+            (
+                id,
+                name,
+                location,
+            )
+        )
+    return shops
+
+
+for shop in generate_shops():
+    cur.execute("INSERT INTO Shops VALUES (%s, %s, %s)", shop)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Shops LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | name              | location |
+|--------------------------------------+-------------------+----------|
+| d31fd718-9ca0-4184-b635-d8f6213614b0 | News.             |      151 |
+| 4ca40567-4130-45fc-9e60-8d3e652cff60 | Research great.   |      112 |
+| eb4d8c35-546c-4e77-b675-1ee42129e350 | Record condition. |       64 |
+| 40c056e1-7654-4a6d-9fd7-22ae3e489205 | Total.            |       57 |
+| b01550bb-c961-425b-8150-cc81ddecb0e9 | Century finish.   |      197 |
+| f05601d8-6905-49a7-8e1a-65dcce319ff8 | Charge.           |       59 |
+| 77071715-8fe7-46da-af30-5e6cd5259c94 | Realize.          |       70 |
+| 22aefb23-f8f8-4739-abd7-0d502d9abef9 | Our.              |      195 |
+| 031c6ea1-33f0-4ccc-9394-a3e792bc6c3a | Bag.              |       17 |
+| 8f4dd306-ea5a-4500-b0fe-4390f38c4959 | Pretty late.      |      179 |
+
+** DONE ~Receipts~
+Tabelka przechwoująca dane o paraonach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Receipts (
+  id VARCHAR(256),
+  shop VARCHAR(256),
+  date DATE,
+  time TIME,
+  PRIMARY KEY (id),
+  FOREIGN KEY (shop) REFERENCES Shops (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_receipts(count=100):
+    receipts = []
+    for _ in range(count):
+        id = fake.uuid4()
+        cur.execute("SELECT id FROM Shops ORDER BY RANDOM() LIMIT 1;")
+        shop = cur.fetchone()[0]
+        date = fake.date_time()
+        time = fake.time()
+        receipts.append(
+            (
+                id,
+                shop,
+                date,
+                time
+            )
+        )
+    return receipts
+
+
+for receipt in generate_receipts():
+    cur.execute("INSERT INTO Receipts VALUES (%s, %s, %s, %s)", receipt)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Receipts LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | shop                                 |       date |     time |
+|--------------------------------------+--------------------------------------+------------+----------|
+| 007eabe6-db95-4434-ba6f-d88d4c605f9d | 40c056e1-7654-4a6d-9fd7-22ae3e489205 | 2000-10-04 | 04:25:04 |
+| b1c51fec-d808-4597-9bf2-c731667fc6a0 | 40c056e1-7654-4a6d-9fd7-22ae3e489205 | 2001-05-02 | 22:43:44 |
+| 9dca9c50-6d7d-4536-bf08-3e5ef9a938f9 | b01550bb-c961-425b-8150-cc81ddecb0e9 | 2017-04-06 | 11:33:04 |
+| 6e2e3459-745f-448e-9467-b16b1591ffb2 | eb4d8c35-546c-4e77-b675-1ee42129e350 | 1984-11-14 | 14:01:07 |
+| 926b2d1b-a85e-40dd-9ba2-c1d7c22d83d0 | 40c056e1-7654-4a6d-9fd7-22ae3e489205 | 2004-07-14 | 11:43:54 |
+| 35240fed-f6cd-452b-9d57-aad7397562a9 | 22aefb23-f8f8-4739-abd7-0d502d9abef9 | 2017-04-27 | 12:12:04 |
+| b72d3b10-6697-41a0-b74a-f3fe428b5098 | 40c056e1-7654-4a6d-9fd7-22ae3e489205 | 1985-11-29 | 23:10:36 |
+| 6f42364a-c37a-4e3d-9d21-3a58f2ec93d3 | 4ca40567-4130-45fc-9e60-8d3e652cff60 | 2009-02-25 | 13:50:31 |
+| 1c550f02-5e12-494a-a679-53c3d8122dd5 | 031c6ea1-33f0-4ccc-9394-a3e792bc6c3a | 2004-02-02 | 20:41:21 |
+| d1cf9fc5-f92d-4c6b-aa40-844bf05375b7 | 4ca40567-4130-45fc-9e60-8d3e652cff60 | 2013-03-19 | 04:38:20 |
+
+** DONE ~Items~
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Items (
+  id VARCHAR(256),
+  name VARCHAR(256),
+  price INT CHECK (price > 0),
+  shop VARCHAR(256),
+  PRIMARY KEY (id),
+  FOREIGN KEY (shop) REFERENCES Shops (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_items(count=100):
+    items = []
+    for _ in range(count):
+        id = fake.uuid4()
+        cur.execute("SELECT id FROM Shops ORDER BY RANDOM() LIMIT 1;")
+        shop = cur.fetchone()[0]
+        name = fake.word() + " " + fake.word()
+        price = fake.pyfloat(min_value=1, max_value=200)
+        items.append(
+            (
+                id,
+                name,
+                price,
+                shop
+            )
+        )
+    return items
+
+
+for item in generate_items():
+    cur.execute("INSERT INTO Items VALUES (%s, %s, %s, %s)", item)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Items LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | name                    | price | shop                                 |
+|--------------------------------------+-------------------------+-------+--------------------------------------|
+| 0a29f7a2-e2dc-4ec7-8bae-bd4b9d8cc852 | whose the               |    93 | eb4d8c35-546c-4e77-b675-1ee42129e350 |
+| 4fbaeaad-3ded-4faa-baae-5d2671940f00 | after couple            |    75 | 4ca40567-4130-45fc-9e60-8d3e652cff60 |
+| b59cd9d4-2d85-4d68-8c33-88ec76402fa7 | personal girl           |    54 | 77071715-8fe7-46da-af30-5e6cd5259c94 |
+| 302e9064-aaea-4dd1-9af3-75547c8fd473 | particular body         |    37 | 22aefb23-f8f8-4739-abd7-0d502d9abef9 |
+| 20feef0f-c832-4dea-b25d-6269477068ef | me evening              |   100 | b01550bb-c961-425b-8150-cc81ddecb0e9 |
+| d0cc3538-5fb1-476f-a9f4-0f761fcdd795 | local like              |   137 | 031c6ea1-33f0-4ccc-9394-a3e792bc6c3a |
+| 432e24bb-7b9c-4ae9-a12c-c23c3560839f | responsibility computer |    62 | eb4d8c35-546c-4e77-b675-1ee42129e350 |
+| 94a2620d-defc-4770-805e-d179ffcdc393 | all see                 |    87 | d31fd718-9ca0-4184-b635-d8f6213614b0 |
+| 4ce10b01-2839-43d5-9e16-d00dad1d3775 | part fall               |    36 | 031c6ea1-33f0-4ccc-9394-a3e792bc6c3a |
+| 27a058ba-67da-45ad-bef7-b2e08ed1968a | cell really             |    54 | 40c056e1-7654-4a6d-9fd7-22ae3e489205 |
+
+** DONE ~Items_Receipts~
+Tabelka przechowująca dane o zakupach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Items_Receipts (
+  item VARCHAR(256),
+  receipt VARCHAR(256),
+  quantity INT CHECK (quantity > 0),
+  PRIMARY KEY (item, receipt),
+  FOREIGN KEY (item) REFERENCES Items (id),
+  FOREIGN KEY (receipt) REFERENCES Receipts (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_items_receipts(count=100):
+    entries = []
+    for _ in range(count):
+        cur.execute("SELECT id FROM Items ORDER BY RANDOM() LIMIT 1;")
+        item = cur.fetchone()[0]
+        cur.execute("SELECT id FROM Receipts ORDER BY RANDOM() LIMIT 1;")
+        receipt = cur.fetchone()[0]
+        quantity = fake.pyint(min_value=1, max_value=5)
+        entries.append((item, receipt, quantity))
+    return entries
+
+
+for entry in generate_items_receipts():
+    try:
+        cur.execute("INSERT INTO Items_Receipts VALUES (%s, %s, %s)", entry)
+    except:
+        print("Something went wrong :(")
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Items_Receipts LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| item                                 | receipt                              | quantity |
+|--------------------------------------+--------------------------------------+----------|
+| e12bebf4-b304-4b96-b90d-42ead3760dcc | 1c550f02-5e12-494a-a679-53c3d8122dd5 |        1 |
+| 8ad411b6-5c81-4e58-8b5f-d1c64147f896 | 5278b6d1-6df8-4194-a178-ffb83cd2a231 |        2 |
+| 8ffe81f8-7ebb-4be1-9629-5f3e20e4df8b | f8ab6e18-9cb0-4593-85e5-27207008b44b |        4 |
+| 72c2270a-29e8-49e9-b923-b7eaccbe9853 | 92b11f92-56c4-4d57-96d4-d8fe091a5666 |        3 |
+| 2910b952-df9a-4336-b503-f9e624408a17 | 27ed034e-366e-41aa-98d8-13af12d3ba32 |        1 |
+| 3b88982b-ea22-4c7b-b0d5-9aa139b86c73 | c3955138-bfb3-4126-940b-1a97934e5270 |        5 |
+| 3b88982b-ea22-4c7b-b0d5-9aa139b86c73 | ec26df43-6fd5-4216-9408-7207b7bdf7a9 |        1 |
+| 684ab134-7df2-4a22-b85e-635c0e2ccfe9 | f079b846-9dfa-445b-a83f-bcc1b12235f1 |        5 |
+| 6e4485e4-f2d6-4de5-a73b-615060a3e475 | f7327827-5269-4a5a-816e-b142b31c0dd0 |        4 |
+| aa6939cc-eeea-4e4d-b80c-1208af27443c | 2072c951-3634-4af9-8262-427f39e1f322 |        4 |
+
+** DONE ~Suppliers~
+Tabelka przechowująca dane o dostawcach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Suppliers (
+  id VARCHAR(256),
+  name VARCHAR(256),
+  PRIMARY KEY (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_suppliers(count=10):
+    suppliers = []
+    for _ in range(count):
+        id = fake.uuid4()
+        name = fake.sentence(nb_words=2)
+        suppliers.append(
+            (
+                id,
+                name
+            )
+        )
+    return suppliers
+
+
+for supplier in generate_suppliers():
+    cur.execute("INSERT INTO Suppliers VALUES (%s, %s)", supplier)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Suppliers LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | name             |
+|--------------------------------------+------------------|
+| dfac1a28-48a1-4795-86f7-aa84a75ebd3a | Could week.      |
+| 0e645aa0-2856-4aef-8eaf-cfdeaf47e046 | Kid.             |
+| 0fca1f4f-bc05-446a-92d5-26e32d87e2c4 | Determine.       |
+| c0f85f8d-5ead-415c-9d63-51f0ef2bb904 | Nice where.      |
+| 56d62b6d-3e0e-4f32-b21e-a69b44b95430 | Bar push.        |
+| 39d60c90-38f3-4e40-ad39-622c80241ad9 | Into eat.        |
+| cedbc29d-5e7b-4a11-af2a-a22ef6f43621 | Thank newspaper. |
+| 04935d11-63a9-4b90-a02a-7bf7ea3d5161 | Remember large.  |
+| 130fea34-4a99-4ef5-b8e4-a9e8a50fa1be | People.          |
+| fb861466-ffa7-4ea7-9ab2-b5cfdd868733 | Would.           |
+
+** DONE ~Supplies~
+Tabelka przechowująca dane o dostawach.
+*** DONE utworzenie tabelki
+#+begin_src sql
+CREATE TABLE Supplies (
+  id VARCHAR(256), -- numer pozwolenia
+  supplier VARCHAR(256),
+  date DATE,
+  PRIMARY KEY (id),
+  FOREIGN KEY (supplier) REFERENCES Suppliers (id)
+);
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE |
+|--------------|
+
+*** DONE generowanie danych
+#+begin_src python :results none
+def generate_supplies(count=100):
+    supplies = []
+    for _ in range(count):
+        id = fake.uuid4()
+        cur.execute("SELECT id FROM Suppliers ORDER BY RANDOM() LIMIT 1;")
+        supplier = cur.fetchone()[0]
+        date = fake.date_time()
+        supplies.append(
+            (
+                id,
+                supplier,
+                date
+            )
+        )
+    return supplies
+
+
+for supply in generate_supplies():
+    cur.execute("INSERT INTO Supplies VALUES (%s, %s, %s)", supply)
+
+conn.commit()
+#+end_src
+
+#+begin_src sql
+SELECT * FROM Supplies LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | supplier                             |       date |
+|--------------------------------------+--------------------------------------+------------|
+| 8050b23b-1247-482d-9f66-fdadfe58559c | 130fea34-4a99-4ef5-b8e4-a9e8a50fa1be | 1979-06-24 |
+| 53ced032-a781-49ae-8ba2-59d3af22d828 | cedbc29d-5e7b-4a11-af2a-a22ef6f43621 | 1974-10-08 |
+| b32eacb8-cc41-44b4-94b5-8de359c17451 | 0e645aa0-2856-4aef-8eaf-cfdeaf47e046 | 1983-11-26 |
+| c06ea89b-85cf-46fc-9274-2140b3cd0a64 | 0fca1f4f-bc05-446a-92d5-26e32d87e2c4 | 1992-02-09 |
+| aa874a5f-5cea-4e24-a922-7b1e9100a1ee | 04935d11-63a9-4b90-a02a-7bf7ea3d5161 | 1987-01-20 |
+| 5b208deb-62f8-4dd4-8549-db12d99337e8 | 56d62b6d-3e0e-4f32-b21e-a69b44b95430 | 1980-02-02 |
+| be2e7a26-537c-4dc3-a4eb-63d9c93223fc | dfac1a28-48a1-4795-86f7-aa84a75ebd3a | 1993-09-01 |
+| 9e4d641b-3764-4f67-b0bc-58ea1d0ba587 | 130fea34-4a99-4ef5-b8e4-a9e8a50fa1be | 2000-11-12 |
+| 76ac1b00-a7aa-425f-b464-1024b1b003ad | 130fea34-4a99-4ef5-b8e4-a9e8a50fa1be | 1974-06-22 |
+| 80e25695-205e-4728-8dc1-c7fde4778b72 | 130fea34-4a99-4ef5-b8e4-a9e8a50fa1be | 1999-05-06 |
+* funkcje [9/9]
+:PROPERTIES:
+:header-args:sql+: :tangle ./out/functions.sql
+:END:
+** DONE 🐈 ~departure~
+Funkcja zwracająca listę wylotów w danym dniu.
+
+#+begin_src sql :results none
+create or replace  function departure(date_of_departure DATE)returns TABLE(
+    destination VARCHAR(256), --kierunek samolotu (z KRK - do )
+    flight_id VARCHAR(256), --id lotu
+    departure_time TIME  --godzina wylotu
+)
+
+as
+$$
+begin
+    return query
+    select A.city, F.id, F.departure_time
+    FROM flights as F JOIN connections as CO ON F.connection = CO.id
+        JOIN Docks as D on Co.departure_dock = D.id
+        JOIN Airports AS A ON D.airport = A.id
+    WHERE F.departure_date = date_of_departure and A.city = 'Cracow';
+end;
+$$
+LANGUAGE 'plpgsql'
+#+end_src
+
+#+begin_src sql
+SELECT * FROM departure('1979-08-26');
+#+end_src
+
+#+RESULTS:
+| destination | flight_id                            | departure_time |
+|-------------+--------------------------------------+----------------|
+| Cracow      | e0fa1472-4c69-48e1-97b6-bba237b030c8 |       21:06:20 |
+
+** DONE 🐈 ~arrival~
+Przyloty do Krakowa.
+#+begin_src sql :results none
+create or replace  function arrival(date_of_arrival DATE)returns TABLE(
+    from_where VARCHAR(256), --skad przylecial samolot (z .. - do KRK )
+    flight_id VARCHAR(256), --id lotu
+    arrival_time TIME  --godzina wylotu
+)
+
+as
+$$
+begin
+    return query
+    select A.city, F.id, F.arrival_time
+    FROM flights as F JOIN connections as CO ON F.connection = CO.id
+        JOIN Docks as D ON Co.arrival_dock = D.id
+        JOIN Airports AS A ON D.airport = A.id
+    WHERE F.arrival_date = date_of_arrival and A.city = 'Cracow';
+end;
+$$
+LANGUAGE 'plpgsql'
+#+end_src
+
+#+begin_src sql
+SELECT * FROM arrival('1979-08-20');
+#+end_src
+
+#+RESULTS:
+| from_where | flight_id                            | arrival_time |
+|------------+--------------------------------------+--------------|
+| Cracow     | e0fa1472-4c69-48e1-97b6-bba237b030c8 |     10:03:16 |
+
+** DONE 🐈 ~browser~
+Wyszukiwarka lotów.
+#+begin_src sql :results none
+DROP FUNCTION IF EXISTS browser;
+
+create or replace function browser(city_of_arrival VARCHAR(256), date_of_departure DATE, date_of_arrival DATE)
+returns TABLE(time_of_departure TIME, duration_of_flight FLOAT,
+             departure_airport VARCHAR(256), arrival_airport VARCHAR(256))
+as
+$$
+begin
+    return query
+    select F.departure_time as time_of_departure, extract(epoch from (F.arrival_time::interval - F.departure_time::time)) / 60 as duration_af_flight, DepartureD.airport, ArrivalD.airport
+    from Flights as F join Connections as Co ON F.connection = Co.id
+        join Docks as DepartureD on DepartureD.id = Co.departure_dock
+        join Airports as DepartureA on DepartureA.id = DepartureD.airport
+        join Docks as ArrivalD on ArrivalD.id = Co.arrival_dock
+        join Airports as ArrivalA on ArrivalA.id = ArrivalD.airport
+    where  DepartureA.city = 'Cracow' and ArrivalA.city = city_of_arrival and F.departure_date = date_of_departure AND F.arrival_date = date_of_arrival;
+end;
+$$
+LANGUAGE 'plpgsql'
+#+end_src
+
+#+begin_src sql
+SELECT * FROM browser('Cracow', '1977-06-23', '1977-06-24');
+#+end_src
+
+#+RESULTS:
+| time_of_departure | duration_of_flight | departure_airport | arrival_airport |
+|-------------------+--------------------+-------------------+-----------------|
+
+** DONE 🌳 ~luggage_cost~
+Funkcja licząca cenę bagażu i nadbagażu dla pasażera na pojedynczy lot. Za każdy bagaż nalicza się 80zł + złotówkę za nadmiarowe centymetry
+#+begin_src sql :results none
+create or replace function luggage_cost(ticket_ref varchar(256))
+returns int
+as
+$$
+declare total int;
+begin
+return (select
+(
+    select coalesce(count(*), 0)
+    from luggage as L
+    where L.ticket = ticket_ref
+) * 80
++
+(
+    select coalesce(sum(L.width) - 119*count(*), 0)
+    from luggage as L
+    where L.ticket = ticket_ref
+    and L.width > 119
+)
++
+(
+    select coalesce(sum(L.height) - 119*count(*), 0)
+    from luggage as L
+    where L.ticket = ticket_ref
+    and L.height > 119
+)
++
+(
+    select coalesce(sum(L.depth) - 81*count(*), 0)
+    from luggage as L
+    where L.ticket = ticket_ref
+    and L.depth > 81
+));
+end;
+$$
+language 'plpgsql';
+#+end_src
+
+#+begin_src sql
+SELECT * FROM luggage_cost(CAST('9168ce09e9' AS VARCHAR(256)));
+#+end_src
+
+#+RESULTS:
+| luggage_cost |
+|--------------|
+|          191 |
+
+** DONE 🌳 ~upcomming_flights~
+Funkcja zwracająca nadchodzące loty pracownika.
+#+begin_src sql :results none
+create or replace function upcomming_flights(employee_id varchar(256))
+returns table(
+    id VARCHAR(256),
+    connection_id VARCHAR(256),
+    departure_time TIME,
+    arrival_time TIME,
+    plane_serial VARCHAR(256),
+    carrier VARCHAR(256),
+    departure_date DATE,
+    arrival_date DATE
+)
+as
+$$
+begin
+    return query
+    select F.id, F.connection as connection_id, F.departure_time, F.arrival_time, F.plane as plane_serial, C.carrier, F.departure_date, F.arrival_date
+    from flights as F join employees_flights as EF on F.id = EF.flight
+    join Connections as C on C.id = F.connection
+    where EF.employee = employee_id and (F.departure_date > current_date or (F.departure_date = current_date and F.departure_time >= current_time))
+    order by F.departure_date, F.departure_time;
+end;
+$$
+language 'plpgsql';
+#+end_src
+
+#+begin_src sql
+SELECT * FROM upcomming_flights('b81f88f4-54c5-419c-91dd-47af7cda96ad');
+#+end_src
+
+#+RESULTS:
+| id | connection_id | departure_time | arrival_time | plane_serial | carrier | departure_date | arrival_date |
+|----+---------------+----------------+--------------+--------------+---------+----------------+--------------|
+
+** DONE 🌳 ~affordable_flights~
+Zwraca loty w zadanej cenie.
+
+#+begin_src sql :results none
+create or replace function affordable_flights(price MONEY)
+returns table(
+    id VARCHAR(256),
+    departure_city VARCHAR(256),
+    arrival_city VARCHAR(256),
+    departure_time TIME,
+    arrival_time TIME,
+    carrier_name VARCHAR(256),
+    departure_date DATE,
+    arrival_date DATE
+)
+as
+$$
+begin
+    return query
+    select F.id, DA.city as departure_city, AA.city as arrival_city, F.departure_time, F.arrival_time, Ca.name,  F.departure_date, F.arrival_date
+    from Flights as F
+    join Connections as C on C.id = F.connection
+    join Carriers as Ca on Ca.id = C.carrier
+    join Docks as DD on C.departure_dock = DD.id
+    join Airports as DA on DD.airport = DA.id
+    join Docks as AD on C.arrival_dock = AD.id
+    join Airports as AA on AD.airport = AA.id
+    where F.departure_date > current_date and F.ticket_cost < price
+    order by F.departure_date, F.departure_time;
+end;
+$$
+language 'plpgsql';
+#+end_src
+
+#+begin_src sql
+SELECT * FROM affordable_flights(CAST(5000.0 AS MONEY)) LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id | departure_city | arrival_city | departure_time | arrival_time | carrier_name | departure_date | arrival_date |
+|----+----------------+--------------+----------------+--------------+--------------+----------------+--------------|
+
+** DONE 👦 ~generate_uuid~
+*** inicjalizacja funkcji
+#+begin_src sql :results none
+CREATE OR REPLACE FUNCTION
+generate_uuid()
+RETURNS VARCHAR(36)
+AS $$
+BEGIN
+   RETURN (SELECT uuid_in(overlay(overlay(md5(random()::text || ':' || clock_timestamp()::text) placing '4' from 13) placing to_hex(floor(random()*(11-8+1) + 8)::int)::text from 17)::cstring));
+END;
+$$
+LANGUAGE 'plpgsql'
+#+end_src
+
+*** przykładowe wykonanie
+#+begin_src sql
+SELECT * FROM generate_uuid();
+#+end_src
+
+#+RESULTS:
+| generate_uuid                        |
+|--------------------------------------|
+| f73c35c4-dfbf-4968-9654-77d6220f3d3b |
+** DONE 👦 ~degrees_to_radians~
+potrzebne do liczenia odległości między koordynatami
+
+#+begin_src sql :results none
+DROP FUNCTION IF EXISTS degrees_to_radians;
+
+CREATE FUNCTION degrees_to_radians(degrees FLOAT)
+RETURNS FLOAT
+AS $$
+    BEGIN
+        RETURN degrees * PI() / 180;
+    END;
+$$
+LANGUAGE PLPGSQL;
+#+end_src
+
+#+begin_src sql
+SELECT * FROM degrees_to_radians(CAST(114 AS FLOAT));
+#+end_src
+
+#+RESULTS:
+| degrees_to_radians |
+|--------------------|
+| 1.9896753472735356 |
+
+** DONE 👦 ~money_lost_to_discounts~
+#+begin_src sql :results none
+DROP FUNCTION IF EXISTS money_lost_to_discounts;
+
+CREATE FUNCTION
+money_lost_to_discounts(connection_id VARCHAR(256))
+RETURNS TABLE(
+flight_id VARCHAR(256),
+plane_capacity INT,
+tickets_sold BIGINT,
+unused_capacity BIGINT,
+ticket_cost MONEY,
+expected_ticket_earnings MONEY,
+actual_ticket_earnings MONEY,
+loss_due_to_discounts MONEY
+)
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        Flights.id AS flight_id,
+        -- ArrivalAirports.city AS arrival_city,
+        -- DepartureAirports.city AS departure_city,
+        PlaneModels.capacity AS plane_capacity,
+        COUNT(Tickets.ref) AS tickets_sold,
+        PlaneModels.capacity - COUNT(Tickets.ref) AS unused_capacity,
+        Flights.ticket_cost AS ticket_cost,
+        COUNT(Tickets.ref) * Flights.ticket_cost AS expected_ticket_earnings,
+        SUM(Tickets.Cost) AS actual_ticket_earnings,
+        COUNT(Tickets.ref) * Flights.ticket_cost - SUM(Tickets.Cost) AS loss_due_to_discounts
+    FROM
+        Flights
+        LEFT JOIN Connections ON Flights.connection = Connections.id
+        LEFT JOIN Docks ArrivalDocks ON Connections.arrival_dock = ArrivalDocks.id
+        LEFT JOIN Docks DepartureDocks ON Connections.departure_dock = DepartureDocks.id
+        LEFT JOIN Airports ArrivalAirports ON ArrivalDocks.airport = ArrivalAirports.id
+        LEFT JOIN Airports DepartureAirports ON DepartureDocks.airport = DepartureAirports.id
+        LEFT JOIN Tickets ON Flights.id = Tickets.flight
+        LEFT JOIN Planes ON Flights.plane = Planes.serial
+        LEFT JOIN PlaneModels ON Planes.model = PlaneModels.id
+    WHERE Flights.connection = connection_id
+    GROUP BY flight_id, plane_capacity
+    ORDER BY Flights.arrival_date DESC;
+END;
+$$
+LANGUAGE PLPGSQL
+#+end_src
+
+#+begin_src sql
+SELECT
+    connection,
+    COUNT(Tickets.ref) AS ticket_count
+FROM
+    Tickets
+    LEFT JOIN Flights ON Tickets.flight = Flights.id
+    LEFT JOIN Connections ON Flights.connection = Connections.id
+GROUP BY Flights.connection
+ORDER BY ticket_count DESC
+LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| connection                           | ticket_count |
+|--------------------------------------+--------------|
+| 32d3e60a-0f54-4e44-8f1c-dde9ca5a829c |           11 |
+| 255c5f1d-6557-4382-b888-007655fa378e |            9 |
+| 9c818ef8-836a-4f25-b17c-a7d10a920ef8 |            8 |
+| 40fdc898-41b9-4c90-914d-f44289671413 |            8 |
+| e041fa35-5994-433f-8878-cdfb597668bd |            7 |
+| 270f6bc0-2321-4b29-89b7-e58f0c689e31 |            7 |
+| dc18f7cc-b22c-48c8-b0c5-db87b2b7e0bd |            7 |
+| 77eb9766-23cd-439b-822c-295cc05d6c8c |            6 |
+| c3bb29a5-0b55-4dcb-9697-04d36ec032c1 |            6 |
+| 5da439f3-dec0-4ba0-8f4a-42692bbff7ce |            5 |
+
+#+begin_src sql
+SELECT * FROM money_lost_to_discounts('32d3e60a-0f54-4e44-8f1c-dde9ca5a829c') LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| flight_id                            | plane_capacity | tickets_sold | unused_capacity | ticket_cost | expected_ticket_earnings | actual_ticket_earnings | loss_due_to_discounts |
+|--------------------------------------+----------------+--------------+-----------------+-------------+--------------------------+------------------------+-----------------------|
+| d5438224-2224-4301-8817-da93f7be5463 |            357 |            0 |             357 | $3,323.38   | $0.00                    |                        |                       |
+| bc5860ee-d961-4e4b-a4b6-ebdb4fd198e0 |            372 |            4 |             368 | $1,792.00   | $7,168.00                | $7,168.00              | $0.00                 |
+| 0557956e-b2fe-4c95-b33b-84a883eccef4 |            467 |            2 |             465 | $4,803.60   | $9,607.20                | $9,607.20              | $0.00                 |
+| 80849a22-ce57-4bb7-8e61-dcaae0c41c80 |            372 |            1 |             371 | $1,747.61   | $1,747.61                | $1,747.61              | $0.00                 |
+| 2495f8df-5e6a-4f3c-8101-3da919c0d579 |            383 |            1 |             382 | $1,561.53   | $1,561.53                | $1,561.53              | $0.00                 |
+| cfd68736-3b07-4e02-8f84-6abb7a393f95 |            372 |            1 |             371 | $275.79     | $275.79                  | $275.79                | $0.00                 |
+| e0fa1472-4c69-48e1-97b6-bba237b030c8 |            436 |            2 |             434 | $3,026.85   | $6,053.70                | $6,053.70              | $0.00                 |
+
+* wyzwalacze [10/10]
+:PROPERTIES:
+:header-args:sql+: :tangle ./out/triggers.sql
+:END:
+** DONE 🐈 ~control_capacity~
+Kontroluje ilość pasażerów w samolocie.
+#+begin_src sql :results none
+create or replace function control_capacity_tgr() RETURNS trigger AS $$
+    declare QuantityOfPassengers INT;
+    capacity_of_plane INT;
+    BEGIN
+
+    QuantityOfPassengers := (select count(*) from Tickets where(flight = new.flight));
+    capacity_of_plane := (select PM.capacity FROM Flights as F join Planes AS P ON F.plane = P.serial
+                            JOIN PlaneModels AS PM ON PM.id = P.model
+                            where F.id = NEW.flight);
+
+    if (QuantityOfPassengers = capacity_of_plane) then
+         RAISE EXCEPTION 'Za duzo pasazerow -> nie mozna sprzedac biletu';
+         ROLLBACK;
+    END IF;
+    RETURN NEW;
+    end; $$
+    language 'plpgsql';
+
+drop trigger control_capacity on Reservations;
+
+create trigger control_capacity
+BEFORE INSERT OR UPDATE ON Reservations
+for each row execute procedure control_capacity_tgr();
+#+end_src
+
+#+begin_src sql
+SELECT Flights.id AS flight, capacity, COUNT(Tickets.ref) AS passengers_count
+FROM Flights
+LEFT JOIN Tickets ON Flights.id = Tickets.flight
+LEFT JOIN Planes ON Flights.plane = Planes.serial
+LEFT JOIN PlaneModels ON Planes.model = PlaneModels.id
+GROUP BY Flights.id, capacity
+ORDER BY passengers_count DESC LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| flight                               | capacity | passengers_count |
+|--------------------------------------+----------+------------------|
+| a2d40fc0-8998-4899-a426-09b7569c5440 |      357 |                9 |
+| 06de8f72-86c6-4c33-a3c9-9d446879941c |      372 |                5 |
+| bc5860ee-d961-4e4b-a4b6-ebdb4fd198e0 |      372 |                4 |
+| 06508d14-a774-4607-abfd-74c7b0ef0b57 |      357 |                3 |
+| cd649319-b62b-4697-a3c7-22612ef02cf9 |      416 |                3 |
+| f994c709-b927-4311-a8d5-40b99881fe32 |      467 |                3 |
+| 14df8bf0-fe86-4cc6-832f-dc751fdd8b86 |      416 |                2 |
+| 2cc49bbf-de34-498d-a1b3-c594d37f7efc |      416 |                2 |
+| 0557956e-b2fe-4c95-b33b-84a883eccef4 |      467 |                2 |
+| 12a3064d-dd3f-4523-a737-98935ca63f80 |      416 |                2 |
+
+** DONE 🐈 ~monitor_reservations~
+Podczas tworzenia rezerwacji dodaje czas jej wygaśnięcia.
+#+begin_src sql :results none
+create or replace function update_reservations()
+returns trigger
+as
+$$
+begin
+    update reservations
+    set expire_date = current_date + 14, expire_time = current_time
+    where id = new.id;
+    return new;
+end;
+$$
+language 'plpgsql';
+
+drop trigger monitor_reservations on reservations;
+
+create trigger monitor_reservations
+after insert
+on "reservations"
+for each row execute function update_reservations();
+#+end_src
+
+#+begin_src sql
+INSERT INTO Reservations VALUES (
+       generate_uuid(),
+       'a2d40fc0-8998-4899-a426-09b7569c5440',
+       '0d23da67-045e-4f14-866f-3d49242290aa'
+);
+
+SELECT * FROM Reservations
+WHERE passenger='0d23da67-045e-4f14-866f-3d49242290aa' AND flight='a2d40fc0-8998-4899-a426-09b7569c5440';
+#+end_src
+
+#+RESULTS:
+| INSERT 0 1                           |                                      |                                      |             |                 |
+|--------------------------------------+--------------------------------------+--------------------------------------+-------------+-----------------|
+| id                                   | flight                               | passenger                            | expire_date |     expire_time |
+| d6164b72-e171-4375-87d5-0fcf4c2e3928 | a2d40fc0-8998-4899-a426-09b7569c5440 | 0d23da67-045e-4f14-866f-3d49242290aa |  2021-03-08 | 03:44:35.010428 |
+
+** DONE 🐈 ~delete_flights~
+Usuwa nadchodzące loty dla usuwanego połączenia.
+#+begin_src sql :results none
+create or replace function delete_flights_function() returns trigger as $$
+begin
+    delete from flights
+    where connection_id = old.id and departure_date > current_date;
+    return new;
+end; $$
+language 'plpgsql';
+
+create trigger delete_flights
+after delete
+on connections
+for each row
+execute function delete_flights_function();
+#+end_src
+
+** DONE 🌳 ~monitor_shifts_updates/inserts~
+Śledzi historię czasu pracy pracowników.
+#+begin_src sql :results none
+create or replace function update_shifts_history_on_insertion()
+returns trigger
+as
+$$
+begin
+    -- add shift sets with start_date = today and empty end_date
+    insert into shiftshistory(start_date, end_date, start_time, end_time, employee)
+    select current_date as start_date, null as end_date, start_time, end_time, employee from inserted;
+    return new;
+end;
+$$
+language 'plpgsql';
+#+end_src
+
+#+begin_src sql :results none
+create or replace function update_shifts_history_on_update()
+returns trigger
+as
+$$
+begin
+    -- set today's date as end of previous shift sets
+    update shiftshistory
+    set end_date = current_date - integer '1'
+    where employee in (select employee from deleted) and end_date is null;
+
+    -- add shift sets with start_date = today and empty end_date
+    insert into shiftshistory(start_date, end_date, start_time, end_time, employee)
+    select current_date as start_date, null as end_date, start_time, end_time, employee from inserted;
+end;
+$$
+language 'plpgsql';
+#+end_src
+
+#+begin_src sql :results none
+drop trigger if exists monitor_shifts_updates on shifts;
+drop trigger if exists monitor_shifts_inserts on shifts;
+
+create trigger monitor_shifts_updates
+after update
+on "shifts"
+referencing old table as deleted new table as inserted
+for each statement execute function update_shifts_history_on_update();
+
+create trigger monitor_shifts_inserts
+after insert
+on "shifts"
+referencing new table as inserted
+for each statement execute function update_shifts_history_on_insertion();
+#+end_src
+
+#+begin_src sql :results none
+INSERT INTO Shifts VALUES (
+       'b0160727-6c0b-47c9-8480-970b91d46994',
+       '12:00',
+       '20:00'
+);
+#+end_src
+
+#+begin_src sql
+SELECT * FROM ShiftsHistory WHERE employee = 'b0160727-6c0b-47c9-8480-970b91d46994';
+#+end_src
+
+#+RESULTS:
+| employee                             | start_date | end_date | start_time | end_time |
+|--------------------------------------+------------+----------+------------+----------|
+| b0160727-6c0b-47c9-8480-970b91d46994 | 2021-02-22 |          |   12:00:00 | 20:00:00 |
+
+** DONE 🌳 ~monitor_vacations~
+Jeśli wprowadzane są konfliktujące wakacje, przedłuża te już istniejące.
+#+begin_src sql :results none
+create or replace function update_vacations()
+returns trigger
+as
+$$
+declare
+    conflict_employee varchar(256);
+    conflict_start date;
+begin
+    conflict_employee := (select V.employee from vacations as V
+    where V.employee = new.employee and ( ( V.start_date <= new.start_date and V.end_date >= new.start_date ) or ( V.start_date <= new.end_date and V.end_date >= new.end_date ) ) and (V.start_date <> new.start_date or V.end_date <> new.end_date)
+    );
+
+    conflict_start := (select V.start_date from vacations as V
+    where V.employee = new.employee and ( ( V.start_date <= new.start_date and V.end_date >= new.start_date ) or ( V.start_date <= new.end_date and V.end_date >= new.end_date ) ) and (V.start_date <> new.start_date or V.end_date <> new.end_date)
+    );
+
+    if conflict_employee is not null
+    then
+        update vacations
+        set start_date = least(
+            (select start_date from vacations where
+            employee = conflict_employee and start_date = conflict_start),
+            new.start_date
+            ),
+        end_date = greatest(
+            (select end_date from vacations
+            where employee = conflict_employee and start_date = conflict_start),
+            new.end_date
+            )
+        where employee = conflict_employee and start_date = conflict_start;
+        delete from vacations where employee = new.employee and start_date = new.start_date and end_date = new.end_date;
+    end if;
+
+    return new;
+end;
+$$ language 'plpgsql';
+#+end_src
+
+#+begin_src sql :results none
+create trigger monitor_vacations
+after insert
+on "vacations"
+for each row
+execute procedure update_vacations();
+#+end_src
+
+
+#+begin_src sql :results none
+INSERT INTO Vacations VALUES ('b0160727-6c0b-47c9-8480-970b91d46994', '2020-11-01', '2020-11-20');
+INSERT INTO Vacations VALUES ('b0160727-6c0b-47c9-8480-970b91d46994', '2020-11-19', '2020-11-24');
+#+end_src
+
+#+begin_src sql
+select * from vacations where employee = 'b0160727-6c0b-47c9-8480-970b91d46994';
+#+end_src
+
+#+RESULTS:
+| employee                             | start_date |   end_date |
+|--------------------------------------+------------+------------|
+| b0160727-6c0b-47c9-8480-970b91d46994 | 2020-11-01 | 2020-11-24 |
+
+** DONE 🌳 ~set_flight_details~
+Podczas dodawania lotu przepisuje daty z ~Connections~.
+#+begin_src sql :results none
+create or replace function update_flights_details()
+returns trigger
+as
+$$
+begin
+    update flights
+    set departure_time = (select departure_time from connections where id = new.connection),
+    arrival_time = (select arrival_time from connections where id = new.connection)
+    where flights.id = new.id;
+    return new;
+end;
+$$
+language 'plpgsql';
+#+end_src
+
+#+begin_src sql :results none
+create trigger set_flights_details
+after insert
+on "flights"
+-- referencing new table as inserted
+for each row
+execute procedure update_flights_details();
+#+end_src
+
+#+begin_src sql :results none
+INSERT INTO Flights(id, connection) VALUES (generate_uuid(), '887e8b69-0fcf-4b68-b9ff-966903843c0a');
+#+end_src
+
+#+begin_src sql
+SELECT F.* FROM Flights as F
+WHERE connection = '887e8b69-0fcf-4b68-b9ff-966903843c0a';
+#+end_src
+
+#+RESULTS:
+| id                                   | connection                           | departure_time | arrival_time | departure_date | arrival_date |       plane | ticket_cost |
+| a502de90-1a5c-46e5-9b4b-054118c47a95 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |                |              |             |             |
+
+** DONE 🌳 ~update_luggage~
+Poprawia dane bagażu tak, aby wymiary były w odpowieniej kolejności.
+#+begin_src sql :results none
+create or replace function update_luggage()
+returns trigger
+as
+$$
+begin
+    update luggage
+    set height = width, width = height
+    where id=new.id and width > height;
+
+    update luggage
+    set height = depth, depth = height
+    where id=new.id and depth > height;
+
+    update luggage
+    set width = depth, depth = width
+    where id=new.id and depth > width;
+
+    return new;
+end;
+$$
+language 'plpgsql';
+#+end_src
+
+#+begin_src sql :results none
+drop trigger if exists monitor_luggage on Luggage;
+create trigger monitor_luggage
+after insert or update
+on "luggage"
+-- referencing new table as inserted
+for each row execute function update_luggage();
+#+end_src
+
+#+begin_src sql
+INSERT INTO Luggage VALUES (generate_uuid(), 100, 200, 150, '2b8c997fe3');
+
+SELECT * FROM Luggage WHERE ticket='2b8c997fe3';
+#+end_src
+
+#+RESULTS:
+| INSERT 0 1                           |        |       |       |            |
+|--------------------------------------+--------+-------+-------+------------|
+| id                                   | height | width | depth | ticket     |
+| f9c95160-9b95-4ba4-8fba-697b949641b5 |    130 |   100 |    50 | 2b8c997fe3 |
+| 2d8a3d95-9a9c-4c72-b675-7c6c64e52bdb |    200 |   150 |   100 | 2b8c997fe3 |
+| 0080611f-6a0a-4081-b031-5949ff24305f |    200 |   150 |   100 | 2b8c997fe3 |
+
+** DONE 👦 ~add_miles_for_a_flight~
+wyzwalacz dodający pasażerowi punkty za lot
+#+begin_src sql :results none
+CREATE OR REPLACE FUNCTION
+add_miles_for_a_ticket()
+RETURNS TRIGGER
+AS $$
+   BEGIN
+      INSERT INTO miles
+      VALUES (
+             generate_uuid(),
+             (SELECT carrier FROM Flights LEFT JOIN Connections ON Flights.connection = Connections.id WHERE Flights.id = new.flight),
+             new.passenger,
+             (SELECT loyality_miles FROM Flights LEFT JOIN Connections ON Flights.connection = Connections.id WHERE Flights.id = new.flight),
+             'miles for flight with ticket ' || new.ref
+      );
+      RETURN NEW;
+   END;
+$$
+LANGUAGE PLPGSQL;
+
+DROP TRIGGER IF EXISTS add_miles_for_a_ticket_trigger ON tickets;
+
+CREATE TRIGGER add_miles_for_a_ticket_trigger
+AFTER INSERT ON tickets
+FOR EACH ROW EXECUTE PROCEDURE add_miles_for_a_ticket();
+#+end_src
+
+#+begin_src sql
+INSERT INTO Tickets VALUES (generate_uuid(), '0d23da67-045e-4f14-866f-3d49242290aa', 'a2d40fc0-8998-4899-a426-09b7569c5440', 1200);
+
+SELECT * FROM Miles WHERE passenger='0d23da67-045e-4f14-866f-3d49242290aa';
+#+end_src
+
+#+RESULTS:
+| INSERT 0 1                           |                                      |                                      |       |                                                                   |
+|--------------------------------------+--------------------------------------+--------------------------------------+-------+-------------------------------------------------------------------|
+| id                                   | carrier                              | passenger                            | miles | description                                                       |
+| b7ff49bb-76e1-4041-bcbe-ca4ec16c7d85 | 9088abfb-1068-4e0e-89e2-15c19aee3556 | 0d23da67-045e-4f14-866f-3d49242290aa |    10 |                                                                   |
+| 9f1d8256-b442-461d-82da-6b2928949534 | 9088abfb-1068-4e0e-89e2-15c19aee3556 | 0d23da67-045e-4f14-866f-3d49242290aa |    10 |                                                                   |
+| 37155459-7ee6-41e7-8745-8c7dbb0b3f81 | 9088abfb-1068-4e0e-89e2-15c19aee3556 | 0d23da67-045e-4f14-866f-3d49242290aa |    10 | miles for flight with ticket 6e0c401a-ee4f-4474-abcb-3ff11f23f5ed |
+
+** DONE 👦 ~add_default_miles_for_connections~
+wyzwalacz dodający bazową wartość mil dla danego połączenia na podstawie koordynatów
+- jest to przybliżenie i uproszczenie odległości
+#+begin_src sql :results none
+CREATE OR REPLACE
+FUNCTION add_default_miles_for_a_connection() RETURNS TRIGGER AS $$
+DECLARE
+    earth_radius INTEGER;
+    d_lat FLOAT;
+    d_lon FLOAT;
+    lat1 FLOAT;
+    lat2 FLOAT;
+    lon1 FLOAT;
+    lon2 FLOAT;
+    a FLOAT;
+    c FLOAT;
+    default_miles INTEGER;
+BEGIN
+    earth_radius := 3963;
+
+    lat2 := (
+            SELECT
+                latitude
+            FROM
+                Docks
+                LEFT JOIN Airports ON Docks.airport = Airports.id
+                WHERE Docks.id = NEW.arrival_dock
+            );
+    lon2 := (
+            SELECT
+                longitude
+            FROM
+                Docks
+                LEFT JOIN Airports ON Docks.airport = Airports.id
+                WHERE Docks.id = NEW.arrival_dock
+            );
+
+    lat1 := (
+            SELECT
+                latitude
+            FROM
+                Docks
+                LEFT JOIN Airports ON Docks.airport = Airports.id
+                WHERE Docks.id = NEW.departure_dock
+            );
+    lon1 := (
+            SELECT
+                longitude
+            FROM
+                Docks
+                LEFT JOIN Airports ON Docks.airport = Airports.id
+                WHERE Docks.id = NEW.departure_dock
+            );
+
+    d_lat := (degrees_to_radians(lat2 - lat1));
+    d_lon := (degrees_to_radians(lon2 - lon1));
+
+    lat1 := (degrees_to_radians(lat1));
+    lat2 := (degrees_to_radians(lat2));
+
+    a := SIN(d_lat / 2) * SIN(d_lat / 2) + SIN(d_lon / 2) * SIN(d_lon / 2) * COS(lat1) * COS(lat2);
+    c := 2 * ATAN2(SQRT(a), SQRT(1-a));
+    default_miles := earth_radius * c;
+
+    UPDATE Connections SET loyality_miles = default_miles WHERE id=NEW.id;
+
+    RETURN NEW;
+END;
+$$
+LANGUAGE PLPGSQL;
+
+DROP TRIGGER IF EXISTS add_default_miles_for_a_connection_trigger ON connections;
+
+CREATE TRIGGER add_default_miles_for_a_connection_trigger
+AFTER INSERT ON connections
+FOR EACH ROW
+EXECUTE PROCEDURE add_default_miles_for_a_connection();
+#+end_src
+
+*** Test 🗺
+#+begin_src sql
+INSERT INTO Airports VALUES (
+       generate_uuid(),
+       'Testowe Lotnisko 1',
+       'Polska',
+       'Wałbrzych',
+       50.46,
+       16.17
+);
+
+INSERT INTO Airports VALUES (
+       generate_uuid(),
+       'Testowe Lotnisko 2',
+       'USA',
+       'Tulsa',
+       36.15,
+       -95.99
+);
+
+INSERT INTO Docks VALUES (
+       '1111-2222-3333',
+       'A1',
+       (SELECT id FROM Airports WHERE name='Testowe Lotnisko 1')
+);
+
+INSERT INTO Docks VALUES (
+       '3333-2222-1111',
+       'A1',
+       (SELECT id FROM Airports WHERE name='Testowe Lotnisko 2')
+);
+
+INSERT INTO Connections VALUES (
+       '1111-1111-1111',
+       '19:30',
+       4,
+       '1111-2222-3333',
+       '05:30',
+       5,
+       '3333-2222-1111',
+       (SELECT id FROM Carriers ORDER BY RANDOM() LIMIT 1)
+);
+
+SELECT * FROM Connections WHERE id='1111-1111-1111';
+#+end_src
+
+#+RESULTS:
+| INSERT 0 1     |                |                       |                |              |                     |                |                                      |                |
+|----------------+----------------+-----------------------+----------------+--------------+---------------------+----------------+--------------------------------------+----------------|
+| id             | departure_time | departure_day_of_week | departure_dock | arrival_time | arrival_day_of_week |   arrival_dock | carrier                              | loyality_miles |
+| 1111-1111-1111 |       19:30:00 |                     4 | 1111-2222-3333 |     05:30:00 |                   5 | 3333-2222-1111 | 255cb193-58d7-4185-9657-e91fda8110f5 |           7926 |
+
+** DONE 👦 ~set_flight_details~
+Podczas dodawania lotu przepisuje daty z ~Connections~.
+
+#+begin_src sql :results none
+CREATE OR REPLACE FUNCTION update_flights_details()
+RETURNS TRIGGER
+AS
+$$
+BEGIN
+    UPDATE FLIGHTS
+    SET
+        departure_time = (SELECT departure_time FROM Connections WHERE id = NEW.id),
+        arrival_time = (SELECT arrival_time FROM Connections WHERE id = NEW.id)
+    WHERE flights.id = NEW.id;
+    RETURN NEW;
+END;
+$$
+LANGUAGE PLPGSQL;
+
+DROP TRIGGER IF EXISTS set_flights_details ON flights;
+
+CREATE TRIGGER set_flights_details
+AFTER INSERT
+ON flights
+FOR EACH ROW
+EXECUTE PROCEDURE update_flights_details();
+#+end_src
+
+* widoki [9/9]
+:PROPERTIES:
+:header-args:sql+: :tangle ./out/views.sql
+:END:
+** DONE 🐈 ~list_of_arrival_for_today~
+#+begin_src sql :results none
+create or replace view list_of_arrival_for_today
+AS
+SELECT F.id as id_flight, Co.departure_dock, Co.arrival_dock, F.departure_time, F.arrival_time
+from flights as F JOIN connections as Co on F.connection = Co.id
+    JOIN Docks AS D ON D.id = Co.arrival_dock
+    JOIN Airports as A ON A.id = D.id
+where F.connection = Co.id and F.arrival_date = current_date and A.city= 'Cracow'
+#+end_src
+
+#+begin_src sql
+SELECT * FROM list_of_arrival_for_today;
+#+end_src
+
+#+RESULTS:
+| id_flight | departure_dock | arrival_dock | departure_time | arrival_time |
+|-----------+----------------+--------------+----------------+--------------|
+
+** DONE 🐈 ~list_of_departure_for_today~
+Samoloty odlatujące dziś z Krakowa.
+#+begin_src sql :results none
+create or replace view list_of_departure_for_today
+AS
+SELECT F.id as id_flight, Co.departure_dock, Co.arrival_dock, F.departure_time, F.arrival_time
+from flights as F JOIN connections as Co on F.connection = Co.id
+    JOIN Docks AS D ON D.id = Co.departure_dock
+    JOIN Airports as A ON A.id = D.id
+where F.connection = Co.id and F.departure_date = current_date and A.city = 'Cracow'
+#+end_src
+
+#+begin_src sql
+SELECT * FROM list_of_departure_for_today;
+#+end_src
+
+#+RESULTS:
+| id_flight | departure_dock | arrival_dock | departure_time | arrival_time |
+|-----------+----------------+--------------+----------------+--------------|
+
+** DONE 🐈 ~quick_travel~
+Widok na kierunki, których czas lotu to maksymalnie 2h z Krakowa.
+#+begin_src sql :results none
+create view quick_travel
+AS
+    SELECT Co.departure_dock as departure, Co.departure_day_of_week, F.departure_date
+    FROM Flights as F join connections as Co on F.connection = Co.id
+	join docks as D ON Co.departure_dock = D.id
+    JOIN Airports as A ON A.id = D.id
+    where (Co.arrival_time::interval - Co.departure_time::time)/60 < '02:00' AND A.name = 'Cracow_airport';
+#+end_src
+
+#+begin_src sql
+SELECT * FROM quick_travel;
+#+end_src
+
+#+RESULTS:
+| departure | departure_day_of_week | departure_date |
+|-----------+-----------------------+----------------|
+
+** DONE 🌳 ~employees_needing_training~
+Pracownicy, którzy jeszcze nie mieli szkolenia w ciągu ostatniego roku i powinni je szybko przejść.
+#+begin_src sql :results none
+create or replace view employees_needing_training
+as
+select E.id, E.name, E.surname
+from employees as E
+where E.id not in (
+    select distinct ET.employee
+    from trainings as T join employees_trainings as ET on T.id = ET.employee
+    where T.date > current_date - 365
+);
+#+end_src
+
+#+begin_src sql
+SELECT * FROM employees_needing_training LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | name      | surname     |
+|--------------------------------------+-----------+-------------|
+| b0160727-6c0b-47c9-8480-970b91d46994 | Stephanie | Ballard     |
+| cdcc9ee0-ef02-41b8-8044-a9a14a367b26 | Danny     | Thornton    |
+| 6f4a6544-050a-4025-b926-6d3db3f72e94 | Ryan      | Christensen |
+| b5dfade8-8547-4f5b-9056-5dd3d073766a | Brittney  | Mckenzie    |
+| 29748dd1-0486-4330-ae8e-3cfc476c00b4 | Vickie    | Vincent     |
+| 017fa667-b1db-4bc7-9bae-75b85bb8aad1 | Tracy     | Turner      |
+| d6a02024-6e6f-4232-8635-2fa61ce0d103 | Kathleen  | Russell     |
+| 5d5f4af9-17d7-4472-9ccb-c140a0db8883 | Darrell   | Farmer      |
+| ce8f021f-3a82-4c2c-9e2f-322d893549ca | Lisa      | Maldonado   |
+| 56aeb14c-73d9-4f4e-a8f9-6093c48b68ae | Claire    | Higgins     |
+
+** DONE 🌳 ~upcomming_flights_per_dock~
+Najbliższy lot dla każdego stanowiska na lotnisku.
+#+begin_src sql :results none
+create or replace view upcomming_dock_flights
+as
+select R.*
+from (
+    select O.*, rank() over(partition by O.departure_dock order by O.departure_date, O.departure_time) as rank
+    from (
+        select F.* , C.departure_dock, A.city
+        from flights as F
+        join connections as C on F.connection = C.id
+        join Docks as D on C.departure_dock = D.id
+        join airports as A on D.airport = A.id
+        where A.city = 'Cracow' and F.departure_date >= current_date and F. departure_time >= current_time
+    ) as O
+) as R
+where R.rank = 1
+#+end_src
+
+#+begin_src sql
+SELECT * FROM upcomming_dock_flights;
+#+end_src
+
+#+RESULTS:
+| id | connection | departure_time | arrival_time | departure_date | arrival_date | plane | ticket_cost | departure_dock | city | rank |
+|----+------------+----------------+--------------+----------------+--------------+-------+-------------+----------------+------+------|
+
+** DONE 🌳 ~carriers_earnings~
+Zarobki każdego przewoźnika.
+#+begin_src sql :results none
+create view carriers_earnings
+as
+    select Ca.id, sum(T.cost) as earnings
+    from Carriers as Ca
+    join Connections as Co on Ca.id = Co.carrier
+    join Flights as F on  F.connection = Co.id
+    join Tickets as T on T.flight = F.id
+    group by Ca.id
+
+#+end_src
+
+#+begin_src sql
+SELECT * FROM carriers_earnings;
+#+end_src
+
+#+RESULTS:
+| id                                   | earnings    |
+|--------------------------------------+-------------|
+| 9088abfb-1068-4e0e-89e2-15c19aee3556 | $106,956.60 |
+| f086fe13-79ac-400d-9cd8-066ed7688592 | $36,255.51  |
+| 1650d919-bc84-4255-b292-7281fabce80d | $37,273.81  |
+| c7e18beb-211c-4d16-8f2d-8255316283b8 | $19,023.96  |
+| 79a7147e-5f9a-4982-9030-e1e8d6cb4455 | $7,460.03   |
+| b509e6f4-4f54-4dcb-8483-626ef891b8aa | $15,501.57  |
+| 2cfcc0db-a61a-498c-b486-f95e293a1629 | $17,392.33  |
+| aa2307b4-533f-479c-b987-2bcf2a2e5e14 | $26,413.83  |
+
+** DONE 👦 ~discounts_per_carrier~
+informacja o aktualnej zniżce u danego przewoźnika dla każdego z pasażerów
+
+#+begin_src sql
+SELECT
+    Passengers.id AS passenger,
+    Passengers.name AS name,
+    Passengers.surname AS surname,
+    Carriers.id AS carrier,
+    Carriers.name AS carrier_name,
+    SUM(miles) AS carrier_miles
+FROM
+    Passengers
+    RIGHT JOIN Miles ON Passengers.id = Miles.passenger
+    LEFT JOIN Carriers ON Miles.carrier = Carriers.id
+GROUP BY Passengers.id, Carriers.id
+ORDER BY Passengers.id
+LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| passenger                            | name    | surname     | carrier                              | carrier_name              | carrier_miles |
+|--------------------------------------+---------+-------------+--------------------------------------+---------------------------+---------------|
+| 00fcbd25-779d-4bd9-be7a-d0eec7916f85 | Amanda  | Soto        | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC              |          2589 |
+| 038cf032-fa95-4304-ac4f-02b84ffee0d1 | Amanda  | Miller      | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice              |          3267 |
+| 04f409b2-9518-4404-a780-3bd70b20ad89 | Jeff    | Briggs      | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney           |          3026 |
+| 0b79333a-6a83-4fa0-aa48-6dfbfcdb981a | Sarah   | Christensen | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson |           821 |
+| 0be68d44-3142-4bb2-ba70-801378c874f9 | Colleen | Hayes       | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams           |          2543 |
+| 0be68d44-3142-4bb2-ba70-801378c874f9 | Colleen | Hayes       | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson |          2408 |
+| 0d662297-0394-431b-8385-6a092e2536b5 | Amber   | Taylor      | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC              |          4163 |
+| 11dc9e19-6889-45fc-a38c-85f92a2ec6c0 | Michael | Chavez      | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice              |           111 |
+| 14fc1a01-514e-484a-bf86-b0b5157d04c1 | Jordan  | Sanchez     | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC              |          3397 |
+| 14fc1a01-514e-484a-bf86-b0b5157d04c1 | Jordan  | Sanchez     | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris     |          1280 |
+
+#+begin_src sql
+DROP VIEW IF EXISTS discounts_per_carrier;
+
+CREATE VIEW discounts_per_carrier AS
+SELECT
+    passenger_id,
+    name,
+    surname,
+    carrier_id,
+    carrier_name,
+    carrier_miles,
+    (SELECT
+        rank_name
+    FROM LoyalityRanks
+    WHERE
+        carrier = Passengers_Carriers.carrier_id
+        AND
+        minimum_miles < Passengers_Carriers.carrier_miles
+    ORDER BY minimum_miles DESC
+    LIMIT 1) AS rank_name,
+    (SELECT
+        discount
+    FROM LoyalityRanks
+    WHERE
+        carrier = Passengers_Carriers.carrier_id
+        AND
+        minimum_miles < Passengers_Carriers.carrier_miles
+    ORDER BY minimum_miles DESC
+    LIMIT 1) AS discount
+FROM
+    (
+        SELECT
+            Passengers.id AS passenger_id,
+            Passengers.name AS name,
+            Passengers.surname AS surname,
+            Carriers.id AS carrier_id,
+            Carriers.name AS carrier_name,
+            SUM(miles) AS carrier_miles
+        FROM
+            Passengers
+            RIGHT JOIN Miles ON Passengers.id = Miles.passenger
+            LEFT JOIN Carriers ON Miles.carrier = Carriers.id
+        GROUP BY passenger_id, carrier_id
+    ) AS Passengers_Carriers;
+#+end_src
+
+#+RESULTS:
+| DROP VIEW   |
+|-------------|
+| CREATE VIEW |
+
+#+begin_src sql
+select * from discounts_per_carrier;
+#+end_src
+
+#+RESULTS:
+| passenger_id                         | name        | surname     | carrier_id                           | carrier_name                | carrier_miles | rank_name     | discount |
+|--------------------------------------+-------------+-------------+--------------------------------------+-----------------------------+---------------+---------------+----------|
+| 2e43e0da-6e6b-4105-9389-3369ba067abd | Heather     | Peterson    | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          2458 |               |          |
+| d62dcdfc-21c6-4068-99aa-ab7f80387801 | Melanie     | Moore       | 255cb193-58d7-4185-9657-e91fda8110f5 | Moore-Adkins                |          1534 |               |          |
+| 0d662297-0394-431b-8385-6a092e2536b5 | Amber       | Taylor      | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          4163 |               |          |
+| c6c4b43c-3c09-4dfc-bfa1-701886294bff | Christina   | Johnson     | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          1160 |               |          |
+| 908efbd9-199b-489a-ad97-a02ec73cf04d | Nicole      | Chang       | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |          3047 |               |          |
+| d4f3d82d-54d6-46c7-b19a-1af4e2c07b38 | Samantha    | Chapman     | 255cb193-58d7-4185-9657-e91fda8110f5 | Moore-Adkins                |           966 |               |          |
+| d7fca2bd-84d2-446a-afe2-26c59d653e1f | Timothy     | George      | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |          3082 |               |          |
+| e3877d8e-1388-49e6-9ef4-a0597192898e | Jose        | Travis      | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          4628 |               |          |
+| 243210e8-80ba-4c25-bcef-50a738b540c0 | Robert      | Wallace     | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |          4794 |               |          |
+| 8ced93ed-2399-4bfc-b012-cd99f2cd33d9 | Jennifer    | Allen       | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice                |          4780 | DarkGoldenRod |       36 |
+| ad44c6e1-1fe4-4319-8aa3-6149faa2a01f | Connor      | Martin      | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          4789 | Snow          |       12 |
+| 20ea46c3-d2c7-4129-b4d0-a088ae2737e2 | David       | Cox         | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          4353 |               |          |
+| a1c94689-d04d-40f7-87c6-fcd6b7619b38 | Steven      | Schroeder   | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |           362 |               |          |
+| 6db3317f-5cab-426c-825d-c46fd65581af | Debbie      | Gordon      | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          1337 |               |          |
+| 04f409b2-9518-4404-a780-3bd70b20ad89 | Jeff        | Briggs      | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |          3026 |               |          |
+| fc241e1c-ade2-47a2-9765-8b5b2eae2b31 | Becky       | Grimes      | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          4008 |               |          |
+| 299edb7a-3889-4fc7-aacc-ae633cdca7cd | Ashley      | Wagner      | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          3762 | Ivory         |       27 |
+| 1ecf980c-28ab-4c4e-9891-b951d68e5c07 | Scott       | Brown       | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          4430 | Peru          |       50 |
+| 853e3c32-2e17-4829-b8c1-9708a5b29378 | Rachel      | Valdez      | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |           889 |               |          |
+| 9798f409-155b-43e1-b342-85fe9045b864 | Anthony     | Garrett     | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          3284 |               |          |
+| bddb020b-4984-41b2-9c61-393cda9e9dea | Joanna      | Davis       | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          4690 |               |          |
+| eea61e2d-4d38-435e-afd0-9ea1becc73ac | Todd        | Keller      | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          1066 |               |          |
+| e92896b6-c74b-4026-9c3b-8fbed344b3b9 | Jacob       | Ryan        | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          4439 | Ivory         |       27 |
+| e5a59cc3-7c94-4581-8741-b9af664625b7 | Nathan      | Farmer      | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |          2532 |               |          |
+| ab49f97c-bf69-412a-b5c9-e7f10ecd51f9 | Kirk        | Elliott     | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |           272 |               |          |
+| 2f0de31f-f24c-4539-9864-3c11f8b2b481 | Edward      | Wilson      | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |          2673 |               |          |
+| 97bfb85a-451c-4a34-aa5c-3cf7967d9c98 | Mr.         | Howard      | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          1078 |               |          |
+| 83f02742-a2a3-4be0-a592-efd5b49074d2 | Vanessa     | Freeman     | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          1753 |               |          |
+| f6fbe781-9a01-46e9-ac7d-376124b5f6f2 | Mark        | Figueroa    | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          1983 |               |          |
+| f65d1b17-6414-415d-bc4a-b5a56fdc973d | Jason       | King        | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          1344 |               |          |
+| c46b2663-a444-41ad-a2fc-e7830ae9e272 | Brian       | Lee         | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          2334 | Ivory         |       27 |
+| f7196254-24e9-4896-aa64-c797d651f564 | Jeff        | Moran       | 255cb193-58d7-4185-9657-e91fda8110f5 | Moore-Adkins                |          2286 |               |          |
+| 1a6e1185-0fb2-4c52-8753-c8cb87168b10 | Joseph      | Fields      | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          2541 |               |          |
+| 4d6ca812-bd57-4da8-9b53-bf89f086f7dc | Marilyn     | Young       | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          4937 | Peru          |       50 |
+| 038cf032-fa95-4304-ac4f-02b84ffee0d1 | Amanda      | Miller      | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice                |          3267 | DarkGoldenRod |       36 |
+| 853e3c32-2e17-4829-b8c1-9708a5b29378 | Rachel      | Valdez      | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          1495 |               |          |
+| 4c8f15de-01e1-400c-90ec-7e6b259927a1 | Brittany    | Perez       | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |           765 |               |          |
+| a3529cda-4d4d-4f73-a203-95beb5944563 | Ruth        | Jones       | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          3126 |               |          |
+| 4c4f8426-5162-430e-b87a-d4de4e5c87c8 | Nicole      | Kirby       | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          2176 | Ivory         |       27 |
+| 4bf59600-dc67-49f9-bcb3-92365f03d4f8 | Ronald      | Myers       | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          4237 | Peru          |       50 |
+| 9343fb84-c9f8-4a9c-af2f-3c0e2bffa871 | Catherine   | Ramirez     | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |          1205 |               |          |
+| 0be68d44-3142-4bb2-ba70-801378c874f9 | Colleen     | Hayes       | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          2543 | Ivory         |       27 |
+| e3877d8e-1388-49e6-9ef4-a0597192898e | Jose        | Travis      | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |           621 |               |          |
+| b3e219fe-882d-467e-bc78-fc315533f26b | Holly       | Barajas     | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          2490 |               |          |
+| ff7735de-5939-4107-ad63-5a6d52ad85bc | Jared       | Burgess     | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          3931 |               |          |
+| 7de29481-72bb-4994-80aa-40d23c582d50 | Sara        | Johnson     | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          3521 |               |          |
+| 38baba6e-0e63-4288-93c4-7f7210fd3192 | Jacob       | Moss        | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          4271 |               |          |
+| b8c50077-51b5-41ac-a43e-bcd884f8518d | Deborah     | Clay        | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |           938 |               |          |
+| ac09ef7c-e3f8-486e-b6bc-d527b83188c1 | Jeffrey     | Carlson     | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |          4688 |               |          |
+| 2e43e0da-6e6b-4105-9389-3369ba067abd | Heather     | Peterson    | 039dacc1-ac56-465b-960c-6197fd178860 | Hickman-Ray                 |          2107 |               |          |
+| 2c033532-48c3-4b5a-bc59-da310a5ce428 | Jason       | Gonzalez    | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice                |          3555 | DarkGoldenRod |       36 |
+| 639d5935-44d7-4124-afef-7e0fa5a2caff | Theresa     | Williams    | 255cb193-58d7-4185-9657-e91fda8110f5 | Moore-Adkins                |          4144 |               |          |
+| f6fbe781-9a01-46e9-ac7d-376124b5f6f2 | Mark        | Figueroa    | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |           553 |               |          |
+| f0874e3a-1c8c-4953-a7f9-710a0f22c5a4 | Dana        | Ramos       | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          1968 |               |          |
+| 0b79333a-6a83-4fa0-aa48-6dfbfcdb981a | Sarah       | Christensen | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |           821 |               |          |
+| 2c033532-48c3-4b5a-bc59-da310a5ce428 | Jason       | Gonzalez    | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          2533 |               |          |
+| 5ef556bb-65fd-47e8-94cd-f262c570e1f0 | Jacob       | Ramsey      | 92bcc3ab-bfac-4324-b0c1-325485a19477 | Thompson, Cannon and Holder |          2496 |               |          |
+| 243210e8-80ba-4c25-bcef-50a738b540c0 | Robert      | Wallace     | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice                |          4842 | DarkGoldenRod |       36 |
+| c33e35d7-6d98-4a05-8724-ddc30dfce9b3 | Tyler       | Bird        | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |           928 |               |          |
+| 14fc1a01-514e-484a-bf86-b0b5157d04c1 | Jordan      | Sanchez     | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          1280 |               |          |
+| 79a84715-f52f-4526-ba01-5f4e549c58db | Sean        | Carrillo    | 039dacc1-ac56-465b-960c-6197fd178860 | Hickman-Ray                 |           988 |               |          |
+| 591ed192-f242-4f65-aec5-c474a4321797 | Richard     | Marshall    | 255cb193-58d7-4185-9657-e91fda8110f5 | Moore-Adkins                |          2273 |               |          |
+| f7196254-24e9-4896-aa64-c797d651f564 | Jeff        | Moran       | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |          3743 |               |          |
+| f65d1b17-6414-415d-bc4a-b5a56fdc973d | Jason       | King        | 039dacc1-ac56-465b-960c-6197fd178860 | Hickman-Ray                 |           811 |               |          |
+| 905e71ea-5e05-4bed-ab38-0079585ae15e | Joshua      | Kane        | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice                |           170 |               |          |
+| e59258ca-b0cb-4c73-8db6-59ad91fdec95 | Peter       | Knight      | 039dacc1-ac56-465b-960c-6197fd178860 | Hickman-Ray                 |          4874 | Gold          |       48 |
+| eb9acc8b-3429-4616-8d1b-5c771c16e357 | Crystal     | White       | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |          1788 |               |          |
+| c1f59bf5-8f88-48d0-86be-9f7854b7671c | Erik        | Alvarado    | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |          3189 |               |          |
+| a63a39cb-8bf5-4985-9035-2db5c989c872 | Devin       | Robinson    | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          2884 |               |          |
+| e3fdb00a-4414-4bc1-a6df-2a4126d1d863 | Kristen     | Morgan      | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          4416 | Ivory         |       27 |
+| 48c182c8-f14e-46b6-96a1-f46c29696c93 | Brittany    | Floyd       | 255cb193-58d7-4185-9657-e91fda8110f5 | Moore-Adkins                |          7038 | LightCoral    |       31 |
+| 452b63f3-4dbe-4749-a6f3-3856eb05b0ed | Alyssa      | Hall        | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          3803 | Ivory         |       27 |
+| 14fc1a01-514e-484a-bf86-b0b5157d04c1 | Jordan      | Sanchez     | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          3397 |               |          |
+| 62bf05fe-dd68-4394-9173-3a740bc586cf | Veronica    | Rhodes      | 039dacc1-ac56-465b-960c-6197fd178860 | Hickman-Ray                 |          4843 | Gold          |       48 |
+| 452b63f3-4dbe-4749-a6f3-3856eb05b0ed | Alyssa      | Hall        | 039dacc1-ac56-465b-960c-6197fd178860 | Hickman-Ray                 |           318 |               |          |
+| 97bfb85a-451c-4a34-aa5c-3cf7967d9c98 | Mr.         | Howard      | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          2490 |               |          |
+| 2955f9b2-afd3-46e0-bbab-f0edd39088b2 | Nina        | Black       | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          3008 |               |          |
+| 6c911ab8-ed2b-4157-96eb-5aa3e1df0685 | Ashley      | Cole        | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          3519 |               |          |
+| 0be68d44-3142-4bb2-ba70-801378c874f9 | Colleen     | Hayes       | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          2408 |               |          |
+| 47dbef0c-6732-43f9-9523-496e792b2524 | Christopher | Anderson    | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          1553 |               |          |
+| 62bf05fe-dd68-4394-9173-3a740bc586cf | Veronica    | Rhodes      | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          1786 |               |          |
+| 451a74ca-a80d-46b0-ac88-3c5074d7590f | Kayla       | Simpson     | 5b340b21-f4cb-49a7-a6c5-2fbc59e4c57b | Hansen-Williams             |          4890 | Snow          |       12 |
+| 84525309-c69e-46a2-b353-8a31a84e6f32 | Deborah     | Neal        | 255cb193-58d7-4185-9657-e91fda8110f5 | Moore-Adkins                |          1355 |               |          |
+| d81669b1-e7a0-4147-b45c-b4fb09ebf602 | Kristina    | Underwood   | 445e3a88-7811-4432-b6fd-7975f8be2834 | Mueller-Bradshaw            |          1115 |               |          |
+| 452b63f3-4dbe-4749-a6f3-3856eb05b0ed | Alyssa      | Hall        | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          2116 |               |          |
+| c33e35d7-6d98-4a05-8724-ddc30dfce9b3 | Tyler       | Bird        | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |          1839 |               |          |
+| 75e1cc8c-c5b2-4fdb-af9c-16d0a69840c4 | Pamela      | Anderson    | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |           923 |               |          |
+| d7ef5f32-8986-4a0d-a346-722a93043c70 | Jonathan    | Lane        | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          3866 |               |          |
+| a1f2ff4c-6429-4174-a4c4-19750dc19c08 | Kimberly    | Rowland     | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          4503 |               |          |
+| 82ff7e17-c742-47e0-9dda-3daa3e336aec | Andrew      | Flores      | 039dacc1-ac56-465b-960c-6197fd178860 | Hickman-Ray                 |          4340 | Gold          |       48 |
+| c6c4b43c-3c09-4dfc-bfa1-701886294bff | Christina   | Johnson     | 549da929-8f16-471f-833d-fb5615d14cb6 | Johnston-Mooney             |          4974 |               |          |
+| 1a6e1185-0fb2-4c52-8753-c8cb87168b10 | Joseph      | Fields      | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice                |           645 |               |          |
+| 11dc9e19-6889-45fc-a38c-85f92a2ec6c0 | Michael     | Chavez      | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice                |           111 |               |          |
+| d6d550fc-1c16-493f-a635-1073232a3943 | Douglas     | Ray         | 91624880-4425-411f-a06a-a2f673bafe24 | Dunn, Hill and Harris       |          1262 |               |          |
+| b3377c01-4917-48dc-ad73-3b470753c42e | Cory        | Villa       | 04d96505-69a4-4d21-980f-6a92993d0319 | Vasquez-Rice                |          3356 | DarkGoldenRod |       36 |
+| fe676424-96c2-45ac-af5f-160f25a1c1f9 | Jennifer    | Johnson     | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |          3421 |               |          |
+| 00fcbd25-779d-4bd9-be7a-d0eec7916f85 | Amanda      | Soto        | 288a4392-52b2-4b6a-b898-1ad27c2e21d7 | Peterson LLC                |          2589 |               |          |
+| 63fa2cdf-b61a-42e8-9588-50758fce5d09 | John        | Lewis       | da7776b8-dc61-4380-8965-06a5292123f9 | Miller, Payne and Johnson   |           797 |               |          |
+
+** DONE 👦 ~planes_details~
+#+begin_src sql :results none
+DROP VIEW IF EXISTS planes_details;
+
+CREATE VIEW planes_details AS
+SELECT
+    PlaneModels.id AS model,
+    Carriers.name AS owner,
+    PlaneModels.capacity AS capacity
+FROM
+    Planes
+    LEFT JOIN PlaneModels ON Planes.model = PlaneModels.id
+    LEFT JOIN Carriers ON Planes.owner = Carriers.id;
+#+end_src
+
+#+begin_src sql
+SELECT * FROM planes_details;
+#+end_src
+
+#+RESULTS:
+| model                                | owner                     | capacity |
+|--------------------------------------+---------------------------+----------|
+| 3c0b96cf-2be3-4acb-9a6c-75d7098b0bcd | Bradford-Torres           |      436 |
+| 582391a8-ad63-40dc-9378-c1167f204f90 | Mills, Gibson and Stevens |      241 |
+| 45825b35-b525-4160-9736-35681c0e53bd | West, Wheeler and Kelley  |      372 |
+| 24c46bea-d574-41da-b7d0-485fc763aec3 | Hendricks-Kelly           |      467 |
+| cd139531-9c9b-43cf-9ede-4c387fb381ac | Wallace-Sweeney           |      416 |
+| fa523f7b-b1ef-413e-94a9-b305ae054d15 | Williams Ltd              |      357 |
+| cd139531-9c9b-43cf-9ede-4c387fb381ac | Jones, Butler and Ayers   |      416 |
+| fa523f7b-b1ef-413e-94a9-b305ae054d15 | Williams Ltd              |      357 |
+| 26f3f0ee-9522-4f9d-baa2-a122bea49f78 | Hendricks-Kelly           |      383 |
+| 24c46bea-d574-41da-b7d0-485fc763aec3 | Cox, King and Massey      |      467 |
+
+** DONE 👦 ~best_passengers~
+Lista najbardziej utytułowanych pasażerów (najwięcej mil)
+
+#+begin_src sql :results none
+DROP VIEW IF EXISTS best_passengers;
+
+CREATE VIEW best_passengers AS
+SELECT
+    passengers.name AS name,
+    passengers.surname AS surname,
+    SUM(miles) as miles
+FROM
+    Passengers
+    RIGHT JOIN Miles ON Passengers.id = Miles.passenger
+GROUP BY passengers.id
+ORDER BY miles DESC;
+#+end_src
+
+#+begin_src sql
+SELECT * FROM best_passengers LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| name     | surname    | miles |
+|----------+------------+-------|
+| Allison  | Hunter     | 16464 |
+| Alan     | Martin     | 12058 |
+| Kathryn  | Jones      | 10814 |
+| Whitney  | Macias     |  8908 |
+| Tiffany  | Daugherty  |  7772 |
+| John     | Graham     |  7601 |
+| Larry    | Richardson |  6710 |
+| Amy      | Spencer    |  6579 |
+| Brittney | King       |  6053 |
+| Cindy    | Bauer      |  6004 |
+
+* procedury [6/6]
+:PROPERTIES:
+:header-args:sql+: :tangle ./out/procedures.sql
+:END:
+** DONE 🐈 ~confirm_reservation~
+Procedura zatwierdzająca rezerwacje.
+#+begin_src sql
+create procedure confirm_reservation(id_r VARCHAR(256))
+language 'plpgsql'
+as $$
+BEGIN
+    if not exists (select R.id FROM reservations as R
+                    where R.id = id_r)
+                    then
+	                    RAISE EXCEPTION 'Nie ma rezerwacji na takie id';
+                        ROLLBACK;
+    END IF;
+    if (((select expire_date from Reservations where id=id_r) < CURRENT_DATE) OR
+        ((select expire_date from Reservations where id=id_r) = CURRENT_DATE AND (select expire_time from Reservations where id=id_r) > current_time )) then
+            RAISE EXCEPTION 'Rezerwacja wygasla na dany lot';
+            ROLLBACK;
+    END IF;
+
+    declare ticket_number INT
+    select random() into ticket_number
+    declare discount_for_passenger INT
+    discount_for_passenger = select disc.discount from Reservations as R JOIN flights as F ON R.flight = F.id
+    JOIN Connections AS Co ON F.connection = Co.id
+    JOIN discounts_per_carrier AS disc ON disc.carrier_id = carrier_id AND disc.passenger_id = R.passenger
+    declare price MONEY
+    price = select ticket_cost from Flights as F JOIN Reservations as R ON F.id = R.flight where R.id = id_r
+    insert into Tickets
+	values(ticket_number,(select R.passenger from reservations as R
+                    where R.id = @id_p),(select R.flight from reservations as R
+                    where R.id = @id_p),price * (100-discount_for_passenger)/100);
+
+    select ticket_number
+end; $$
+#+end_src
+
+** DONE 🐈 ~make_reservation~
+Procedura uzupelniajaca tabele tickets inforamcjami z tabeli rezerwacje
+#+begin_src sql
+create procedure make_reservation(id_f VARCHAR(256), id_p VARCHAR(256))
+language 'plpgsql'
+as $$
+BEGIN
+if not exists (select F.id FROM flights as F
+                    where F.id = id_f)
+                    then
+	                    RAISE EXCEPTION 'Nie ma lotu o takim id';
+end if;
+
+if not exists (select P.id FROM passengers as P
+                    where P.id = id_p)
+                    then
+	                    RAISE EXCEPTION 'Nie ma pasazera o takim id';
+end if;
+
+insert into  reservations
+values (CONCAT(id_f + '_' + id_p),id_f, id_p);
+end; $$
+#+end_src
+** DONE 🐈 ~delete_reservation~
+Tworzenie rezerwacji.
+#+begin_src sql
+create procedure delete_reservation(id_r VARCHAR(256))
+language 'plpgsql'
+as $$
+begin
+if not exists (select R.id from reservations as R
+                where R.id = id_r)
+				then
+                RAISE EXCEPTION 'nie ma takiej rezerwacji';
+END if;
+delete from reservations
+where id = id_r;
+end; $$
+#+end_src
+** DONE 🌳 ~quarantine_employees~
+Wysyła na urlop wszystkich pracowników, którzy mogli mieć kontakt z osobą zarażoną.
+#+begin_src sql :results none
+drop procedure if exists quarantine_employees;
+create or replace procedure quarantine_employees(flight_id varchar(256))
+as
+$$
+declare
+    start_city varchar(256);
+    end_city varchar(256);
+    date_of_incident date;
+    time_of_incident time;
+begin
+    insert
+    into vacations
+    select EF.employee as employee, current_date as start_date, current_date + integer '14' as end_date
+    from employees_flights as EF
+    where EF.flight = flight_id;
+
+    select A.city
+        from flights as F
+        join Connections as C on C.id = F.connection
+        join Docks as D on C.departure_dock = D.id
+        join Airports as A on D.airport = A.id
+        where F.id = flight_id
+    into start_city;
+
+    select A.city
+        from flights as F
+        join Connections as C on C.id = F.connection
+        join Docks as D on C.departure_dock = D.id
+        join Airports as A on D.airport = A.id
+        where F.id = flight_id
+    into end_city;
+
+    if (start_city = 'Cracow')
+    then
+        select departure_time from flight where id = flight_id
+        into time_of_incident;
+        select departure_date from flight where id = flight_id
+        into time_of_incident;
+    end if;
+
+    if (end_city = 'Cracow')
+    then
+        select arrival_time from flight where id = flight_id
+        into time_of_incident;
+        select arrival_date from flight where id = flight_id
+        into time_of_incident;
+    end if;
+
+    insert
+    into vacations
+    select E.id as employee, current_date as start_date, current_date + integer '14' as end_date
+    from employees as E join shiftshistory as SH
+    on E.id = SH.employee
+    where SH.start_date <= date_of_incident and (SH.end_date >= date_of_incident or SH.end_date is null)
+        and SH.start_time >= time_of_incident and SH.end_time <= time_of_incident;
+
+end;
+$$
+language 'plpgsql'
+#+end_src
+
+#+begin_src sql
+CALL quarantine_employees('a2d40fc0-8998-4899-a426-09b7569c5440');
+#+end_src
+
+#+RESULTS:
+| CALL |
+|------|
+
+** DONE 🌳 ~decrease_miles~
+#+begin_src sql :results none
+drop procedure if exists decrease_miles;
+create procedure decrease_miles(carrier_id VARCHAR(256), quantity int)
+as
+$$
+begin
+update connections
+set loyality_miles = loyality_miles * 0.9
+where connections.id in (
+    select P.id as connection from (
+        select C.id, count(*) as popularity
+        from Connections as C
+        join Flights as F on F.connection = C.id
+        join Tickets as T on T.flight = F.id
+        where C.carrier = carrier_id
+        group by C.id
+    ) as P
+    order by P.popularity
+    limit quantity
+);
+end;
+$$
+language 'plpgsql'
+#+end_src
+
+#+begin_src sql
+select P.* as connection from (
+        select C.id, C.loyality_miles, count(*) as popularity
+        from Connections as C
+        join Flights as F on F.connection = C.id
+        join Tickets as T on T.flight = F.id
+        where C.carrier = 'aa2307b4-533f-479c-b987-2bcf2a2e5e14'
+        group by C.id
+    ) as P
+order by P.popularity
+limit 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | loyality_miles | popularity |
+|--------------------------------------+----------------+------------|
+| 32d3e60a-0f54-4e44-8f1c-dde9ca5a829c |              8 |         11 |
+
+#+begin_src sql
+CALL decrease_miles('aa2307b4-533f-479c-b987-2bcf2a2e5e14', 5)
+#+end_src
+
+#+RESULTS:
+| CALL |
+|------|
+
+#+begin_src sql
+select P.* as connection from (
+        select C.id, C.loyality_miles, count(*) as popularity
+        from Connections as C
+        join Flights as F on F.connection = C.id
+        join Tickets as T on T.flight = F.id
+        where C.carrier = 'aa2307b4-533f-479c-b987-2bcf2a2e5e14'
+        group by C.id
+    ) as P
+order by P.popularity
+limit 10;
+#+end_src
+
+#+RESULTS:
+| id                                   | loyality_miles | popularity |
+|--------------------------------------+----------------+------------|
+| 32d3e60a-0f54-4e44-8f1c-dde9ca5a829c |              7 |         11 |
+
+** DONE 🌳 ~add_flights~
+#+begin_src sql :results none
+drop procedure if exists add_flights;
+create procedure add_flights(connection_id VARCHAR(256), plane_id VARCHAR(256), price MONEY)
+as
+$$
+    declare todays integer;
+begin
+
+    if not exists (select * from Planes where serial = plane_id) or not exists (select * from Connections where id = connection_id)
+    then
+        rollback;
+    end if;
+
+    todays := date_part('isodow', current_date);
+
+    create temp table first_dates (
+        dow int,
+        date DATE
+    );
+
+    insert into first_dates values (todays, current_date);
+    insert into first_dates values ((todays+1)%7, current_date + integer '1');
+    insert into first_dates values ((todays+2)%7, current_date + integer '2');
+    insert into first_dates values ((todays+3)%7, current_date + integer '3');
+    insert into first_dates values ((todays+4)%7, current_date + integer '4');
+    insert into first_dates values ((todays+5)%7, current_date + integer '5');
+    insert into first_dates values ((todays+6)%7, current_date + integer '6');
+
+    insert into Flights
+    select generate_uuid() as id, C.id as connection, C.departure_time, C.arrival_time, FDD.date as departure_date, FDA.date as arrival_date, plane_id as plane, price as ticket_cost
+    from Connections as C
+    join first_dates as FDD on C.departure_day_of_week = FDD.dow
+    join first_dates as FDA on C.arrival_day_of_week = FDA.dow
+    where C.id = connection_id;
+
+    insert into Flights
+    select generate_uuid() as id, C.id as connection, C.departure_time, C.arrival_time, FDD.date  + integer '7' as departure_date, FDA.date  + integer '7' as arrival_date, plane_id as plane, price as ticket_cost
+    from Connections as C
+    join first_dates as FDD on C.departure_day_of_week = FDD.dow
+    join first_dates as FDA on C.arrival_day_of_week = FDA.dow
+    where C.id = connection_id;
+
+    insert into Flights
+    select generate_uuid() as id, C.id as connection, C.departure_time, C.arrival_time, FDD.date  + integer '14' as departure_date, FDA.date  + integer '14' as arrival_date, plane_id as plane, price as ticket_cost
+    from Connections as C
+    join first_dates as FDD on C.departure_day_of_week = FDD.dow
+    join first_dates as FDA on C.arrival_day_of_week = FDA.dow
+    where C.id = connection_id;
+
+    insert into Flights
+    select generate_uuid() as id, C.id as connection, C.departure_time, C.arrival_time, FDD.date  + integer '21' as departure_date, FDA.date  + integer '21' as arrival_date, plane_id as plane, price as ticket_cost
+    from Connections as C
+    join first_dates as FDD on C.departure_day_of_week = FDD.dow
+    join first_dates as FDA on C.arrival_day_of_week = FDA.dow
+    where C.id = connection_id;
+
+end;
+$$
+language 'plpgsql'
+#+end_src
+
+#+begin_src sql
+SELECT * FROM FLIGHTS where connection = '887e8b69-0fcf-4b68-b9ff-966903843c0a';
+#+end_src
+
+#+RESULTS:
+| id                                   | connection                           | departure_time | arrival_time | departure_date | arrival_date |       plane | ticket_cost |
+|--------------------------------------+--------------------------------------+----------------+--------------+----------------+--------------+-------------+-------------|
+| f8a31e65-81f2-4cb3-bd72-f944b06668e4 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     1975-08-20 |   1975-08-20 | 638-13-1771 | $424.70     |
+| 70ad7174-ff28-4ab0-a9e6-2bf8653d06a1 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     1983-08-19 |   1983-08-19 | 832-92-2307 | $4,657.53   |
+| 5f4b6350-028f-4216-a22f-965575a72594 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     1982-01-27 |   1982-01-27 | 066-09-1735 | $2,727.00   |
+| 9acec8b2-77d9-4a8e-a583-0d4bf26402b9 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     2016-04-07 |   2016-04-07 | 686-86-3326 | $1,908.48   |
+| d2ba5cd1-f81b-49b3-944b-12d64cc5168b | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     1972-08-22 |   1972-08-22 | 638-13-1771 | $3,302.89   |
+| 41fb2c8d-6703-4cb0-aa3f-5857eceb07d0 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     2005-09-08 |   2005-09-08 | 127-65-3328 | $669.37     |
+
+#+begin_src sql :results none
+CALL add_flights('887e8b69-0fcf-4b68-b9ff-966903843c0a', '686-86-3326', CAST(100 as MONEY));
+#+end_src
+
+
+#+begin_src sql
+SELECT * FROM FLIGHTS where connection = '887e8b69-0fcf-4b68-b9ff-966903843c0a';
+#+end_src
+
+#+RESULTS:
+| id                                   | connection                           | departure_time | arrival_time | departure_date | arrival_date |       plane | ticket_cost |
+|--------------------------------------+--------------------------------------+----------------+--------------+----------------+--------------+-------------+-------------|
+| f8a31e65-81f2-4cb3-bd72-f944b06668e4 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     1975-08-20 |   1975-08-20 | 638-13-1771 | $424.70     |
+| 70ad7174-ff28-4ab0-a9e6-2bf8653d06a1 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     1983-08-19 |   1983-08-19 | 832-92-2307 | $4,657.53   |
+| 5f4b6350-028f-4216-a22f-965575a72594 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     1982-01-27 |   1982-01-27 | 066-09-1735 | $2,727.00   |
+| 9acec8b2-77d9-4a8e-a583-0d4bf26402b9 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     2016-04-07 |   2016-04-07 | 686-86-3326 | $1,908.48   |
+| d2ba5cd1-f81b-49b3-944b-12d64cc5168b | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     1972-08-22 |   1972-08-22 | 638-13-1771 | $3,302.89   |
+| 41fb2c8d-6703-4cb0-aa3f-5857eceb07d0 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |       05:35:11 |     16:17:17 |     2005-09-08 |   2005-09-08 | 127-65-3328 | $669.37     |
+| d66d0ca4-1c7a-4e0e-9ef5-1ec7d17a703b | 887e8b69-0fcf-4b68-b9ff-966903843c0a |                |              |     2021-02-27 |   2021-02-27 | 686-86-3326 | $100.00     |
+| 9b0b0b9d-171d-4ac6-8618-bc78edd644eb | 887e8b69-0fcf-4b68-b9ff-966903843c0a |                |              |     2021-03-06 |   2021-03-06 | 686-86-3326 | $100.00     |
+| 19832bc3-e790-49cd-b684-5b1e85a0d3ae | 887e8b69-0fcf-4b68-b9ff-966903843c0a |                |              |     2021-03-13 |   2021-03-13 | 686-86-3326 | $100.00     |
+| afa952d1-1703-4f4f-b525-ec52e4bbeb41 | 887e8b69-0fcf-4b68-b9ff-966903843c0a |                |              |     2021-03-20 |   2021-03-20 | 686-86-3326 | $100.00     |
+
+** DONE 👦 ~change_discount~
+#+begin_quote
+zmień status zniżek danego pasażera (sztuczne dodanie / odjęcie mil)
+#+end_quote
+*** inicjalizacja procedury
+#+begin_src sql :results none
+DROP PROCEDURE IF EXISTS change_discount;
+
+CREATE OR REPLACE PROCEDURE
+change_discount(
+    input_passenger VARCHAR(256),
+    input_carrier VARCHAR(256),
+    input_rank_name VARCHAR(256)
+)
+LANGUAGE PLPGSQL
+AS $$
+BEGIN
+    INSERT INTO miles VALUES (
+        generate_uuid(),
+        input_carrier,
+        input_passenger,
+        (
+                SELECT minimum_miles
+                FROM LoyalityRanks LR
+                WHERE
+                LR.carrier = input_carrier
+                AND
+                LR.rank_name = input_rank_name
+        ) - (SELECT carrier_miles FROM discounts_per_carrier WHERE passenger_id = input_passenger AND carrier_id = input_carrier) + 1,
+        'artificially changing miles count to change passenger rank'
+    );
+END;
+$$
+#+end_src
+
+*** testy
+**** pobranie danych wejściowych
+***** pasażer
+#+begin_src sql
+SELECT * FROM discounts_per_carrier ORDER BY RANDOM() LIMIT 1;
+#+end_src
+
+#+RESULTS:
+| passenger_id                         | name     | surname | carrier_id                           | carrier_name  | carrier_miles | rank_name | discount |
+|--------------------------------------+----------+---------+--------------------------------------+---------------+---------------+-----------+----------|
+| fc08dd1d-d1e4-4535-90a3-28cd1c6e5e83 | Danielle | Oneal   | 31d7f99b-b3e4-4ad9-8341-917749339183 | Wilkins Group |          2280 |           |          |
+
+***** przeceny dla przewoźnika
+#+begin_src sql
+SELECT * FROM LoyalityRanks WHERE carrier = '31d7f99b-b3e4-4ad9-8341-917749339183';
+#+end_src
+
+#+RESULTS:
+| minimum_miles | rank_name      | discount | carrier                              |
+|---------------+----------------+----------+--------------------------------------|
+|         42798 | Red            |       43 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|          7055 | DeepPink       |       12 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         10362 | LightGray      |        5 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         19043 | DarkOrchid     |       11 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         34274 | Brown          |       40 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         18643 | OliveDrab      |       12 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         44887 | Snow           |       27 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         46262 | Yellow         |       38 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         38053 | LimeGreen      |       10 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         48848 | DarkOrchid     |       38 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         35510 | MistyRose      |       35 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         39080 | DarkBlue       |        5 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         32550 | SlateBlue      |       48 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         15672 | MistyRose      |        1 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         36728 | SandyBrown     |       24 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         42309 | DarkOrchid     |       31 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         42307 | WhiteSmoke     |       19 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|         14730 | NavajoWhite    |       20 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+|          5674 | CornflowerBlue |        3 | 31d7f99b-b3e4-4ad9-8341-917749339183 |
+
+***** wykonanie
+#+begin_src sql :results none
+CALL change_discount('fc08dd1d-d1e4-4535-90a3-28cd1c6e5e83', '31d7f99b-b3e4-4ad9-8341-917749339183', 'CornflowerBlue');
+#+end_src
+
+***** test po wykonaniu!
+#+begin_src sql
+SELECT * FROM discounts_per_carrier WHERE passenger_id = 'fc08dd1d-d1e4-4535-90a3-28cd1c6e5e83' AND carrier_id = '31d7f99b-b3e4-4ad9-8341-917749339183';
+#+end_src
+
+#+RESULTS:
+| passenger_id                         | name     | surname | carrier_id                           | carrier_name  | carrier_miles | rank_name      | discount |
+|--------------------------------------+----------+---------+--------------------------------------+---------------+---------------+----------------+----------|
+| fc08dd1d-d1e4-4535-90a3-28cd1c6e5e83 | Danielle | Oneal   | 31d7f99b-b3e4-4ad9-8341-917749339183 | Wilkins Group |          5675 | CornflowerBlue |        3 |
+
+** DONE 👦 ~replace_plane~
+podmiana samolotu na inny dostępny na wypadek awarii
+
+#+begin_src sql :results none
+CREATE OR REPLACE PROCEDURE
+replace_plane(flight VARCHAR(256))
+AS $$
+BEGIN
+    UPDATE Flights SET Flights.plane_serial = (
+        SELECT Planes.serial
+        FROM Planes LEFT JOIN Flights ON Flights.plane = Planes.serial
+        WHERE
+            (
+                departure_date > (SELECT arrival_date FROM Flights WHERE Flights.id = flight)
+                AND
+                arrival_date < (SELECT departure_date FROM Flights WHERE Flights.id = flight)
+            )
+            OR Flights.id IS NULL
+        AND
+            plane NOT IN (
+            SELECT plane
+            FROM Flights F
+            WHERE
+                arrival_date > F.departure_date AND F.departure_date > departure_date
+            )
+    )
+    WHERE Flights.id = flight;
+END;
+$$
+LANGUAGE PLPGSQL
+#+end_src
+
+** DONE 👦 ~lower_prices_for_least_popular_items~
+#+begin_src sql
+CREATE OR REPLACE PROCEDURE
+lower_prices_for_least_popular_items()
+AS $$
+   BEGIN
+
+   UPDATE Items SET price = 0.9 * price
+   WHERE Items.id IN (
+         SELECT item FROM (
+                SELECT item, SUM(quantity) AS times_occured, price
+                FROM Items_Receipts LEFT JOIN Items ON Items_Receipts.Item = Items.id
+                GROUP BY item, price
+                ORDER BY times_occured, item ASC
+                LIMIT 10
+         ) AS LeastBought
+   );
+
+   END;
+$$
+LANGUAGE PLPGSQL
+#+end_src
+
+#+RESULTS:
+| CREATE PROCEDURE |
+|------------------|
+
+#+begin_src sql
+SELECT item, SUM(quantity) AS times_occured, price
+FROM Items_Receipts LEFT JOIN Items ON Items_Receipts.Item = Items.id
+GROUP BY item, price
+ORDER BY times_occured, item ASC
+LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| item                                 | times_occured | price |
+|--------------------------------------+---------------+-------|
+| 1151077d-73b2-4aeb-b9ef-a82b1d92160d |             1 |   111 |
+| 1f78c2b4-4336-4163-afdd-4b6aca7d6bbc |             1 |   106 |
+| 95ddcdf5-0e7d-4c0a-b742-0186dd6c0045 |             1 |    31 |
+| e5c366ff-4e1d-4f21-8263-02dac4138dd0 |             1 |    99 |
+| e74b5d0c-c82e-47a5-97ea-f4b6776f6a53 |             1 |    86 |
+| ef8cbb6e-aa68-4917-83c6-4da785bf48a2 |             1 |    77 |
+| 074c6627-0139-4b05-9f9a-8bd3d4285cbb |             2 |    90 |
+| 1653285b-a341-4109-9319-c237991bd335 |             2 |   173 |
+| 20dd2bce-744a-46eb-9f72-ff4c3484359c |             2 |    13 |
+| 260799e7-307f-4f76-addc-a3028ad69764 |             2 |    24 |
+
+#+begin_src sql
+CALL lower_prices_for_least_popular_items();
+#+end_src
+
+#+RESULTS:
+| CALL |
+|------|
+
+#+begin_src sql
+SELECT item, SUM(quantity) AS times_occured, price
+FROM Items_Receipts LEFT JOIN Items ON Items_Receipts.Item = Items.id
+GROUP BY item, price
+ORDER BY times_occured, item ASC
+LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| item                                 | times_occured | price |
+|--------------------------------------+---------------+-------|
+| 1151077d-73b2-4aeb-b9ef-a82b1d92160d |             1 |   100 |
+| 1f78c2b4-4336-4163-afdd-4b6aca7d6bbc |             1 |    95 |
+| 95ddcdf5-0e7d-4c0a-b742-0186dd6c0045 |             1 |    28 |
+| e5c366ff-4e1d-4f21-8263-02dac4138dd0 |             1 |    89 |
+| e74b5d0c-c82e-47a5-97ea-f4b6776f6a53 |             1 |    77 |
+| ef8cbb6e-aa68-4917-83c6-4da785bf48a2 |             1 |    69 |
+| 074c6627-0139-4b05-9f9a-8bd3d4285cbb |             2 |    81 |
+| 1653285b-a341-4109-9319-c237991bd335 |             2 |   156 |
+| 20dd2bce-744a-46eb-9f72-ff4c3484359c |             2 |    12 |
+| 260799e7-307f-4f76-addc-a3028ad69764 |             2 |    22 |
